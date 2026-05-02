@@ -1,17 +1,12 @@
 package alex.se.gamaw.tavli
 
+import alex.se.gamaw.tavli.composables.TavliBoardView
+import alex.se.gamaw.tavli.composables.TavliScreen
+import alex.se.gamaw.tavli.ui.theme.TavliTheme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import alex.se.gamaw.tavli.ui.theme.TavliTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,7 +14,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TavliTheme {
-
+                TavliScreen()
+//                TavliBoardView()
+//                TavliBoard(points = listOf(BoardPoint(1,1,false, false)))
             }
         }
     }
