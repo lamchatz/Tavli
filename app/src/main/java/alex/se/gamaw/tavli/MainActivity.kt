@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
         )
         TavliTheme {
             Board(samplePieces, onPieceClick = { i ->
+                println("lala")
                 println(i)
             })
         }
