@@ -1,75 +1,33 @@
 package alex.se.gamaw.tavli.composables
 
 import alex.se.gamaw.tavli.data.Piece
-import alex.se.gamaw.tavli.data.PieceColor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
-
-
-@Composable
-fun TavliScreen() {
-    val points = 24
-
-    var pieces by remember {
-        mutableStateOf(
-            List(30) { index ->
-                Piece(
-                    id = index,
-                    color = if (index < 15) PieceColor.WHITE else PieceColor.BLACK,
-                    pointIndex = index % points
-                )
-            }
-        )
-    }
-
-    var selectedPieceId by remember { mutableStateOf<Int?>(null) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF6D3F1F)),
-        contentAlignment = Alignment.Center
-    ) {
-        Board(
-            pieces = pieces,
-            selectedPieceId = selectedPieceId,
-            onPieceClick = { selectedPieceId = it },
-            onPieceMove = { pieceId, newPoint ->
-                pieces = pieces.map {
-                    if (it.id == pieceId) it.copy(pointIndex = newPoint)
-                    else it
-                }
-                selectedPieceId = null
-            }
-        )
-    }
-}
-
+data class PointLayout(
+    val path: Path,
+    val centerX: Float,
+    val isTop: Boolean
+)
 
 
 @Composable
 fun Board(
     pieces: List<Piece>,
-    selectedPieceId: Int?,
-    onPieceClick: (Int) -> Unit,
-    onPieceMove: (Int, Int) -> Unit
+    onPieceClick: (Int) -> Unit = {}
 ) {
     val boardColor = Color(0xFF8B5A2B)
     val lightTriangle = Color(0xFFD9A066)
@@ -78,25 +36,84 @@ fun Board(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxHeight(0.75f)
-            .padding(16.dp)
+            .padding(top = 64.dp, start = 16.dp, end = 16.dp, bottom = 32.dp)
             .background(boardColor)
     ) {
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
+        val map = mutableMapOf<Int, PointLayout>()
 
-        val pointWidth = width / 12f
+
+        val barWidth = width * 0.05f
+        val sideWidth = (width - barWidth) / 2f
+        val pointWidth = sideWidth / 6f
         val pointHeight = height / 2f * 0.7f
 
-        // ---------------------------
-        // DRAW TRIANGLES
-        // ---------------------------
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
 
-        Canvas(modifier = Modifier.fillMaxSize()) {
+                        val pieceRadius = pointWidth * 0.4f
+                        val spacing = pieceRadius * 2.1f
 
-            val barWidth = width * 0.05f
-            val sideWidth = (width - barWidth) / 2f
-            val pointWidth = sideWidth / 6f
+                        // FIRST: check if a piece was clicked
+                        map.forEach { (index, layout) ->
 
+                            val stack = pieces.filter { it.position == index }
+
+                            stack.forEachIndexed { stackIndex, piece ->
+
+                                val y = if (layout.isTop) {
+                                    pieceRadius + spacing * stackIndex
+                                } else {
+                                    size.height - pieceRadius - spacing * stackIndex
+                                }
+
+                                val center = Offset(layout.centerX, y)
+
+                                val distance = (offset - center).getDistance()
+
+                                if (distance <= pieceRadius) {
+                                    onPieceClick(index)
+                                    return@detectTapGestures
+                                }
+                            }
+                        }
+
+                        // SECOND: fallback → click on column
+                        val barWidth = size.width * 0.05f
+                        val sideWidth = (size.width - barWidth) / 2f
+                        val pointWidth = sideWidth / 6f
+
+                        val x = offset.x
+                        val y = offset.y
+
+                        val isTop = y < size.height / 2f
+
+                        val index = when {
+                            x < sideWidth -> {
+                                val local = (x / pointWidth).toInt()
+                                val reversed = (5 - local).coerceIn(0, 5)
+                                if (isTop) 6 + reversed else 17 - reversed
+                            }
+
+                            x > sideWidth + barWidth -> {
+                                val local = ((x - sideWidth - barWidth) / pointWidth).toInt()
+                                val reversed = (5 - local).coerceIn(0, 5)
+                                if (isTop) reversed else 23 - reversed
+                            }
+
+                            else -> null
+                        }
+
+                        index?.let { onPieceClick(it) }
+                    }
+                }) {
+
+
+            // DRAW TRIANGLES + STORE LAYOUT
             for (i in 0 until 12) {
 
                 val isLeftSide = i < 6
@@ -111,68 +128,80 @@ fun Board(
                 val isLight = i % 2 == 0
 
                 // TOP
+                val topPath = Path().apply {
+                    moveTo(x, 0f)
+                    lineTo(x + pointWidth, 0f)
+                    lineTo(x + pointWidth / 2f, pointHeight)
+                    close()
+                }
+
+                val topIndex = 11 - i
+                map[topIndex] = PointLayout(
+                    path = topPath,
+                    centerX = x + pointWidth / 2f,
+                    isTop = true
+                )
+
                 drawPath(
-                    path = Path().apply {
-                        moveTo(x, 0f)
-                        lineTo(x + pointWidth, 0f)
-                        lineTo(x + pointWidth / 2f, pointHeight)
-                        close()
-                    },
+                    path = topPath,
                     color = if (isLight) lightTriangle else darkTriangle
                 )
 
-                // BOTTOM
+
+// BOTTOM
+                val bottomIndex = 12 + i
+
+                val bottomPath = Path().apply {
+                    moveTo(x, height)
+                    lineTo(x + pointWidth, height)
+                    lineTo(x + pointWidth / 2f, height - pointHeight)
+                    close()
+                }
+
+                map[bottomIndex] = PointLayout(
+                    path = bottomPath,
+                    centerX = x + pointWidth / 2f,
+                    isTop = false
+                )
+
                 drawPath(
-                    path = Path().apply {
-                        moveTo(x, height)
-                        lineTo(x + pointWidth, height)
-                        lineTo(x + pointWidth / 2f, height - pointHeight)
-                        close()
-                    },
+                    path = bottomPath,
                     color = if (!isLight) lightTriangle else darkTriangle
                 )
             }
 
+            // DRAW BAR
             drawRect(
                 color = Color(0xFF4E2A17),
                 topLeft = Offset(sideWidth, 0f),
-                size = androidx.compose.ui.geometry.Size(barWidth, height)
+                size = Size(barWidth, height)
             )
-        }
 
-//
-//        // ---------------------------
-//        // HIGHLIGHTS (for now: ALL points)
-//        // ---------------------------
-//        if (selectedPieceId != null) {
-//            Canvas(modifier = Modifier.fillMaxSize()) {
-//                for (i in 0 until 24) {
-//                    val col = i % 12
-//                    val rowTop = i < 12
-//
-//                    val x = col * pointWidth
-//                    val y = if (rowTop) 0f else height / 2f
-//
-//                    drawRect(
-//                        color = Color.Yellow.copy(alpha = 0.2f),
-//                        topLeft = Offset(x, y),
-//                        size = androidx.compose.ui.geometry.Size(pointWidth, height / 2f)
-//                    )
-//                }
-//            }
-//        }
-//
-//        // ---------------------------
-//        // PIECES
-//        // ---------------------------
-//        pieces.forEach { piece ->
-//            PieceView(
-//                piece = piece,
-//                boardWidth = width,
-//                boardHeight = height,
-//                onClick = { onPieceClick(piece.id) },
-//                onDrop = { newPoint -> onPieceMove(piece.id, newPoint) }
-//            )
-//        }
+            // DRAW PIECES (STACKED)
+            val pieceRadius = pointWidth * 0.4f
+            val spacing = pieceRadius * 2.1f
+
+            map.forEach { (index, layout) ->
+
+                val stack = pieces.filter { it.position == index }
+
+                stack.forEachIndexed { stackIndex, piece ->
+
+                    val y = if (layout.isTop) {
+                        // start from TOP (base) and go DOWN
+                        pieceRadius + spacing * stackIndex
+                    } else {
+                        // start from BOTTOM (base) and go UP
+                        height - pieceRadius - spacing * stackIndex
+                    }
+
+                    drawCircle(
+                        color = piece.color,
+                        radius = pieceRadius,
+                        center = Offset(layout.centerX, y)
+                    )
+                }
+            }
+        }
     }
 }
