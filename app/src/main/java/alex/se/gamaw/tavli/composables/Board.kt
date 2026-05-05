@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -36,10 +39,8 @@ val lightTriangle = Color(0xFFD9A066)
 val darkTriangle = Color(0xFF5C2E1A)
 val barColor = Color(0xFF4E2A17)
 
-
 @Composable
 fun GameScreen() {
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -48,17 +49,17 @@ fun GameScreen() {
     ) {
         Board(
             listOf(
-                Piece(0, Color.White),
-                Piece(1, Color.Gray),
-                Piece(2, Color.Green),
-                Piece(2, Color.Green),
-                Piece(3, Color.Red),
-                Piece(4, Color.Blue),
-                Piece(5, Color.Magenta),
-                Piece(6, Color.DarkGray),
-                Piece(11, Color.Black),
-                Piece(12, Color.Red),
-                Piece(18, Color.White),
+                Piece(0,0, Color.White),
+                Piece(1,1, Color.Gray),
+                Piece(2,2, Color.Green),
+                Piece(3,2, Color.Green),
+                Piece(4,3, Color.Red),
+                Piece(5,4, Color.Blue),
+                Piece(6,5, Color.Magenta),
+                Piece(7,6, Color.DarkGray),
+                Piece(8,11, Color.Black),
+                Piece(9,12, Color.Red),
+                Piece(10,18, Color.White),
             ), onPieceClick = { i ->
                 println("lala")
                 println(i)
@@ -66,15 +67,18 @@ fun GameScreen() {
     }
 }
 
-
 @Composable
 fun Board(
-    pieces: List<Piece>,
+    initialPieces: List<Piece>,
     onPieceClick: (Int) -> Unit = {}
 ) {
+    var pieces by remember { mutableStateOf(initialPieces) }
+
     val piecesByPosition = remember(pieces) {
         pieces.groupBy { it.position }
     }
+
+    var selectedPoint by remember { mutableStateOf<Int?>(null) }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -104,7 +108,42 @@ fun Board(
                     detectTapGestures { offset ->
                         val clickedIndex =
                             findClickedIndex(offset, size = size, layout, piecesByPosition)
-                        clickedIndex?.let { onPieceClick(it) }
+
+                            if (clickedIndex != null ) {
+                                if (selectedPoint == clickedIndex) {
+                                    println("never mind")
+                                    selectedPoint = null
+                                }
+                                if (selectedPoint == null ) {
+
+                                    val pieceToSelect = pieces.findLast { it.position == clickedIndex }
+                                    if (pieceToSelect != null) {
+                                        println("Selected: $clickedIndex. We have to go somewhere")
+
+                                        selectedPoint = clickedIndex
+                                    }
+
+                                } else {
+                                    println("We are going from $selectedPoint to $clickedIndex")
+
+                                    val pieceToMove = pieces.findLast { it.position == selectedPoint }
+
+                                    if (pieceToMove != null) {
+                                        pieces = pieces.map { piece ->
+                                            if (piece.id == pieceToMove.id) {
+                                                piece.copy(position = clickedIndex)
+                                            } else {
+                                                piece
+                                            }
+                                        }
+                                    }
+
+                                    selectedPoint = null
+                                }
+                            } else {
+                                println("Never mind")
+                                selectedPoint = null
+                            }
                     }
                 }
         ) {
@@ -142,7 +181,6 @@ fun Board(
         }
     }
 }
-
 
 fun findClickedIndex(
     offset: Offset,
