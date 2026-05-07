@@ -1,3 +1,23 @@
 package alex.se.gamaw.tavli
 
-//TODO bar! move pieces to and from. resolve hit, dice, diples
+//TODO dice, diples
+
+//TODO Select Game Mode menu
+//TODO Select Connection Mode menu
+//TODO Select player colors?
+
+//TODO Game UI, Name: Score for each player, resign (confirm with other player for mono/diplo), Option to change game mode,
+// time limit for each move?
+//TODO resign menu (Mono Diplo)
+
+//TODO bar! move pieces to and from.
+//TODO resolve hit, mazema
+//TODO skip turn if no legalMoves
+
+//TODO fevga
+//TODO plakoto
+
+//TODO local
+//TODO online
+//TODO LAN
+//TODO bluetooth
