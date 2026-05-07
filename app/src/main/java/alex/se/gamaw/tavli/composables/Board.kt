@@ -15,11 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -27,9 +23,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 val boardBrush = Brush.verticalGradient(
@@ -44,39 +43,41 @@ val barColor = Color(0xFF4E2A17)
 
 @Composable
 fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
-    boardViewModel.setInitialBoard(listOf(
-        Piece(0,5, Color.White),
-        Piece(1,5, Color.White),
-        Piece(2,5, Color.White),
-        Piece(3,5, Color.White),
-        Piece(4,5, Color.White),
-        Piece(5,7, Color.White),
-        Piece(6,7, Color.White),
-        Piece(7,7, Color.White),
-        Piece(8,12, Color.White),
-        Piece(9,12, Color.White),
-        Piece(10,12, Color.White),
-        Piece(11,12, Color.White),
-        Piece(12,12, Color.White),
-        Piece(13,23, Color.White),
-        Piece(14,23, Color.White),
+    boardViewModel.setInitialBoard(
+        listOf(
+            Piece(0, 5, Color.White),
+            Piece(1, 5, Color.White),
+            Piece(2, 5, Color.White),
+            Piece(3, 5, Color.White),
+            Piece(4, 5, Color.White),
+            Piece(5, 7, Color.White),
+            Piece(6, 7, Color.White),
+            Piece(7, 7, Color.White),
+            Piece(8, 12, Color.White),
+            Piece(9, 12, Color.White),
+            Piece(10, 12, Color.White),
+            Piece(11, 12, Color.White),
+            Piece(12, 12, Color.White),
+            Piece(13, 23, Color.White),
+            Piece(14, 23, Color.White),
 
-        Piece(15,18, Color.Black),
-        Piece(16,18, Color.Black),
-        Piece(17,18, Color.Black),
-        Piece(18,18, Color.Black),
-        Piece(19,18, Color.Black),
-        Piece(20,16, Color.Black),
-        Piece(21,16, Color.Black),
-        Piece(22,16, Color.Black),
-        Piece(23,11, Color.Black),
-        Piece(24,11, Color.Black),
-        Piece(25,11, Color.Black),
-        Piece(26,11, Color.Black),
-        Piece(27,11, Color.Black),
-        Piece(28,0, Color.Black),
-        Piece(29,0, Color.Black),
-    ))
+            Piece(15, 18, Color.Black),
+            Piece(16, 18, Color.Black),
+            Piece(17, 18, Color.Black),
+            Piece(18, 18, Color.Black),
+            Piece(19, 18, Color.Black),
+            Piece(20, 16, Color.Black),
+            Piece(21, 16, Color.Black),
+            Piece(22, 16, Color.Black),
+            Piece(23, 11, Color.Black),
+            Piece(24, 11, Color.Black),
+            Piece(25, 11, Color.Black),
+            Piece(26, 11, Color.Black),
+            Piece(27, 11, Color.Black),
+            Piece(28, 0, Color.Black),
+            Piece(29, 0, Color.Black),
+        )
+    )
 
     Box(
         modifier = Modifier
@@ -85,21 +86,19 @@ fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
         contentAlignment = Alignment.Center
     ) {
         Board(
-            boardViewModel = boardViewModel,
-            onPieceClick = { i ->
-                println("lala")
-                println(i)
-                boardViewModel.s(i)
-            })
+            boardViewModel = boardViewModel
+        )
     }
 }
 
 @Composable
 fun Board(
-    boardViewModel: BoardViewModel,
-    onPieceClick: (Int?) -> Unit = {}
+    boardViewModel: BoardViewModel
 ) {
-    val piecesByPosition = boardViewModel.piecesByPosition.collectAsState()
+    val piecesByPosition = boardViewModel.piecesByPosition.collectAsStateWithLifecycle()
+    val highlights = boardViewModel.allowedMoves.collectAsStateWithLifecycle()
+    val selectedPoint = boardViewModel.selectedPoint.collectAsStateWithLifecycle()
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxHeight(0.75f)
@@ -121,14 +120,19 @@ fun Board(
             calculateBoardLayout(width, height)
         }
 
-
-
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(width, height) {
                     detectTapGestures { offset ->
-                        onPieceClick(findClickedIndex(offset, size = size, layout, piecesByPosition.value))
+                        boardViewModel.processInput(
+                            findClickedIndex(
+                                offset,
+                                size = size,
+                                layout,
+                                piecesByPosition.value
+                            )
+                        )
                     }
                 }
         ) {
@@ -136,6 +140,32 @@ fun Board(
             layout.pointLayouts.forEach { (index, point) ->
                 val color = if (point.isLight) lightTriangle else darkTriangle
                 drawPath(path = point.path, color = color)
+
+                if (highlights.value.contains(index)) {
+                    drawPath(
+                        path = point.path,
+                        color = Color.Yellow.copy(alpha = 0.4f), // Semi-transparent glow
+                        style = Fill
+                    )
+                    drawPath(
+                        path = point.path,
+                        color = Color.Yellow,
+                        style = Stroke(width = 4.dp.toPx()) // Sharp outline
+                    )
+                }
+
+                if (selectedPoint.value == index) {
+                    drawPath(
+                        path = point.path,
+                        color = Color.Magenta.copy(alpha = 0.4f), // Semi-transparent glow
+                        style = Fill
+                    )
+                    drawPath(
+                        path = point.path,
+                        color = Color.Magenta,
+                        style = Stroke(width = 4.dp.toPx()) // Sharp outline
+                    )
+                }
             }
 
             // 3. Draw Bar
