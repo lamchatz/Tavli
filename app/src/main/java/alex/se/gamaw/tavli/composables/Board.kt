@@ -3,6 +3,8 @@ package alex.se.gamaw.tavli.composables
 import alex.se.gamaw.tavli.data.Board
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.calculateBoardLayout
+import alex.se.gamaw.tavli.gamemode.PortesMode
+import alex.se.gamaw.tavli.viewmodel.BoardViewModel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,10 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -25,9 +24,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 val boardBrush = Brush.verticalGradient(
     0.0f to Color(0xFF5D3A1A),
@@ -40,7 +43,9 @@ val darkTriangle = Color(0xFF5C2E1A)
 val barColor = Color(0xFF4E2A17)
 
 @Composable
-fun GameScreen() {
+fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
+
+    boardViewModel.setGameMode(PortesMode())
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -48,37 +53,18 @@ fun GameScreen() {
         contentAlignment = Alignment.Center
     ) {
         Board(
-            listOf(
-                Piece(0,0, Color.White),
-                Piece(1,1, Color.Gray),
-                Piece(2,2, Color.Green),
-                Piece(3,2, Color.Green),
-                Piece(4,3, Color.Red),
-                Piece(5,4, Color.Blue),
-                Piece(6,5, Color.Magenta),
-                Piece(7,6, Color.DarkGray),
-                Piece(8,11, Color.Black),
-                Piece(9,12, Color.Red),
-                Piece(10,18, Color.White),
-            ), onPieceClick = { i ->
-                println("lala")
-                println(i)
-            })
+            boardViewModel = boardViewModel
+        )
     }
 }
 
 @Composable
 fun Board(
-    initialPieces: List<Piece>,
-    onPieceClick: (Int) -> Unit = {}
+    boardViewModel: BoardViewModel
 ) {
-    var pieces by remember { mutableStateOf(initialPieces) }
-
-    val piecesByPosition = remember(pieces) {
-        pieces.groupBy { it.position }
-    }
-
-    var selectedPoint by remember { mutableStateOf<Int?>(null) }
+    val piecesByPosition = boardViewModel.piecesByPosition.collectAsStateWithLifecycle()
+    val highlights = boardViewModel.allowedMoves.collectAsStateWithLifecycle()
+    val selectedPoint = boardViewModel.selectedPoint.collectAsStateWithLifecycle()
 
     BoxWithConstraints(
         modifier = Modifier
@@ -106,44 +92,15 @@ fun Board(
                 .fillMaxSize()
                 .pointerInput(width, height) {
                     detectTapGestures { offset ->
-                        val clickedIndex =
-                            findClickedIndex(offset, size = size, layout, piecesByPosition)
-
-                            if (clickedIndex != null ) {
-                                if (selectedPoint == clickedIndex) {
-                                    println("never mind")
-                                    selectedPoint = null
-                                }
-                                if (selectedPoint == null ) {
-
-                                    val pieceToSelect = pieces.findLast { it.position == clickedIndex }
-                                    if (pieceToSelect != null) {
-                                        println("Selected: $clickedIndex. We have to go somewhere")
-
-                                        selectedPoint = clickedIndex
-                                    }
-
-                                } else {
-                                    println("We are going from $selectedPoint to $clickedIndex")
-
-                                    val pieceToMove = pieces.findLast { it.position == selectedPoint }
-
-                                    if (pieceToMove != null) {
-                                        pieces = pieces.map { piece ->
-                                            if (piece.id == pieceToMove.id) {
-                                                piece.copy(position = clickedIndex)
-                                            } else {
-                                                piece
-                                            }
-                                        }
-                                    }
-
-                                    selectedPoint = null
-                                }
-                            } else {
-                                println("Never mind")
-                                selectedPoint = null
-                            }
+                        boardViewModel.processInput(
+                            findClickedIndex(
+                                offset,
+                                size = size,
+                                layout,
+                                piecesByPosition.value
+                            )
+                        )
+                        println(boardViewModel.hasLegalMove())
                     }
                 }
         ) {
@@ -151,6 +108,32 @@ fun Board(
             layout.pointLayouts.forEach { (index, point) ->
                 val color = if (point.isLight) lightTriangle else darkTriangle
                 drawPath(path = point.path, color = color)
+
+                if (highlights.value.contains(index)) {
+                    drawPath(
+                        path = point.path,
+                        color = Color.Yellow.copy(alpha = 0.4f), // Semi-transparent glow
+                        style = Fill
+                    )
+                    drawPath(
+                        path = point.path,
+                        color = Color.Yellow,
+                        style = Stroke(width = 4.dp.toPx()) // Sharp outline
+                    )
+                }
+
+                if (selectedPoint.value == index) {
+                    drawPath(
+                        path = point.path,
+                        color = Color.Magenta.copy(alpha = 0.4f), // Semi-transparent glow
+                        style = Fill
+                    )
+                    drawPath(
+                        path = point.path,
+                        color = Color.Magenta,
+                        style = Stroke(width = 4.dp.toPx()) // Sharp outline
+                    )
+                }
             }
 
             // 3. Draw Bar
@@ -161,7 +144,7 @@ fun Board(
             )
 
             // 4. Draw Pieces (Using the pre-grouped map)
-            piecesByPosition.forEach { (index, stack) ->
+            piecesByPosition.value.forEach { (index, stack) ->
                 val point = layout.pointLayouts[index] ?: return@forEach
 
                 stack.forEachIndexed { stackIndex, piece ->
