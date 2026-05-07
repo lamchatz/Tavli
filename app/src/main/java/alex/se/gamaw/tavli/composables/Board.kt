@@ -3,6 +3,7 @@ package alex.se.gamaw.tavli.composables
 import alex.se.gamaw.tavli.data.Board
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.calculateBoardLayout
+import alex.se.gamaw.tavli.gamemode.PortesMode
 import alex.se.gamaw.tavli.viewmodel.BoardViewModel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -43,42 +44,8 @@ val barColor = Color(0xFF4E2A17)
 
 @Composable
 fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
-    boardViewModel.setInitialBoard(
-        listOf(
-            Piece(0, 5, Color.White),
-            Piece(1, 5, Color.White),
-            Piece(2, 5, Color.White),
-            Piece(3, 5, Color.White),
-            Piece(4, 5, Color.White),
-            Piece(5, 7, Color.White),
-            Piece(6, 7, Color.White),
-            Piece(7, 7, Color.White),
-            Piece(8, 12, Color.White),
-            Piece(9, 12, Color.White),
-            Piece(10, 12, Color.White),
-            Piece(11, 12, Color.White),
-            Piece(12, 12, Color.White),
-            Piece(13, 23, Color.White),
-            Piece(14, 23, Color.White),
 
-            Piece(15, 18, Color.Black),
-            Piece(16, 18, Color.Black),
-            Piece(17, 18, Color.Black),
-            Piece(18, 18, Color.Black),
-            Piece(19, 18, Color.Black),
-            Piece(20, 16, Color.Black),
-            Piece(21, 16, Color.Black),
-            Piece(22, 16, Color.Black),
-            Piece(23, 11, Color.Black),
-            Piece(24, 11, Color.Black),
-            Piece(25, 11, Color.Black),
-            Piece(26, 11, Color.Black),
-            Piece(27, 11, Color.Black),
-            Piece(28, 0, Color.Black),
-            Piece(29, 0, Color.Black),
-        )
-    )
-
+    boardViewModel.setGameMode(PortesMode())
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -133,6 +100,7 @@ fun Board(
                                 piecesByPosition.value
                             )
                         )
+                        println(boardViewModel.hasLegalMove())
                     }
                 }
         ) {

@@ -1,6 +1,8 @@
 package alex.se.gamaw.tavli.viewmodel
 
 import alex.se.gamaw.tavli.data.Piece
+import alex.se.gamaw.tavli.gamemode.GameMode
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +20,14 @@ class BoardViewModel : ViewModel() {
     private val _allowedMoves = MutableStateFlow<Set<Int>>(emptySet())
     val allowedMoves: StateFlow<Set<Int>> = _allowedMoves.asStateFlow()
 
-    fun setInitialBoard(pieces: List<Piece>) {
+    private lateinit var gameMode: GameMode
+
+    fun setGameMode(gameMode: GameMode) {
+        this.gameMode = gameMode
+        this.setInitialBoard(gameMode.initialBoard())
+    }
+
+    private fun setInitialBoard(pieces: List<Piece>) {
         _piecesByPosition.value = pieces.groupBy { it.position }
     }
 
@@ -29,15 +38,18 @@ class BoardViewModel : ViewModel() {
     }
 
     private fun moveTo(clickedPosition: Int?) {
+        val from = _selectedPoint.value ?: return
         val to = clickedPosition ?: return
 
-        println("We are going from $selectedPoint to $to")
+        if (!_allowedMoves.value.contains(to)) {
+            cancelMove()
+            return
+        }
+
+        println("We are going from ${_selectedPoint.value} to $to")
 
         _piecesByPosition.update { currentMap ->
-            val fromIndex = selectedPoint.value ?: return@update currentMap
-
-
-            val oldList = currentMap[fromIndex].orEmpty()
+            val oldList = currentMap[from].orEmpty()
 
             if (oldList.isNotEmpty()) {
                 val pieceToMove = oldList.last().copy(position = to)
@@ -45,7 +57,7 @@ class BoardViewModel : ViewModel() {
                 val updatedNewList = currentMap[to].orEmpty() + pieceToMove
 
                 currentMap + mapOf(
-                    fromIndex to updatedOldList,
+                    from to updatedOldList,
                     to to updatedNewList
                 )
             } else {
@@ -64,8 +76,12 @@ class BoardViewModel : ViewModel() {
 
             _selectedPoint.value = clickedPosition
 
-            _allowedMoves.value = setOf(1, 2, 3)
+            _allowedMoves.value = gameMode.getLegalMoves(selectedPiece, _piecesByPosition.value)
         }
+    }
+
+    fun hasLegalMove(): Boolean {
+        return gameMode.hasLegalMove(_piecesByPosition.value, Color.Black, listOf(5,5))
     }
 
     fun processInput(clickedPosition: Int?) {
