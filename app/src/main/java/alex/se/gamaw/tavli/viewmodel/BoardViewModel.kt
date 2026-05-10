@@ -25,7 +25,7 @@ class BoardViewModel : ViewModel() {
     private lateinit var gameMode: GameMode
     private lateinit var connection: Connection
 
-    private val _dice = MutableStateFlow<List<Die>>(emptyList())
+    private val _dice = MutableStateFlow(listOf(Die(4), Die(3)))
     val dice = _dice.asStateFlow()
 
     private var numberOfMoves = 0
@@ -37,7 +37,7 @@ class BoardViewModel : ViewModel() {
 
     fun setConnection(connection: Connection) {
         this.connection = connection
-        _dice.value = connection.getDice()
+//        _dice.value = connection.getDice()
     }
 
     private fun setInitialBoard(pieces: List<Piece>) {
@@ -61,7 +61,7 @@ class BoardViewModel : ViewModel() {
 
         println("We are going from ${_selectedPoint.value} to $to")
 
-        _piecesByPosition.value = gameMode.resolveMove(_piecesByPosition.value, from, to)
+        _piecesByPosition.value = gameMode.resolveMove(_piecesByPosition.value, from, to, _dice.value)
 
         numberOfMoves++
         markDieAsPlayed(abs(to - from))
@@ -101,6 +101,9 @@ class BoardViewModel : ViewModel() {
             moveTo(clickedPosition)
             if (roundCompleted()) {
                 nextRound()
+                while(!hasLegalMove()) {
+                    nextRound()
+                }
             }
         } else {
             cancelMove()
@@ -121,6 +124,10 @@ class BoardViewModel : ViewModel() {
     }
 
     private fun markDieAsPlayed(move: Int) {
+        if (move > 6) {
+            _dice.value[0].played = true
+            _dice.value[1].played = true
+        }
         if (areDiceDouble()) {
             if (numberOfMoves == 2) {
                 _dice.value[0].played = true

@@ -9,5 +9,5 @@ interface GameMode {
     fun getLegalMoves(selectedPiece: Piece, boardState: Map<Int, List<Piece>>, dice: List<Die>): Set<Int>
     fun hasLegalMove(boardState: Map<Int, List<Piece>>, color: Color, dice: List<Die>): Boolean
 
-    fun resolveMove(boardState: Map<Int, List<Piece>>, from: Int, to: Int): Map<Int, List<Piece>>
+    fun resolveMove(boardState: Map<Int, List<Piece>>, from: Int, to: Int, dice: List<Die>): Map<Int, List<Piece>>
 }
