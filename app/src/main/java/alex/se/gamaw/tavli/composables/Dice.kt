@@ -1,5 +1,6 @@
 package alex.se.gamaw.tavli.composables
 
+import alex.se.gamaw.tavli.data.Die
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -18,12 +19,13 @@ private val DieDots = mapOf(
 
 
 private val color = Color(0xFFF5F5F5)
+private val playedColor = Color(0xFFBDBBBB)
 fun DrawScope.drawDie(
-    value: Int,
+    die: Die,
     center: Offset,
     dieSize: Float
 ) {
-    val dotCoords = DieDots[value] ?: return
+    val dotCoords = DieDots[die.value] ?: return
     val cornerRadius = dieSize * 0.15f
     val dotRadius = dieSize * 0.08f
 
@@ -31,7 +33,7 @@ fun DrawScope.drawDie(
     val halfSize = dieSize / 2
     val topLeft = Offset(center.x - halfSize, center.y - halfSize)
     drawRoundRect(
-        color = color,
+        color = if (die.played) playedColor else color,
         topLeft = topLeft,
         size = Size(dieSize, dieSize),
         cornerRadius = CornerRadius(cornerRadius, cornerRadius)

@@ -192,7 +192,7 @@ fun Board(
 
                 diceValues.forEachIndexed { index, value ->
                     drawDie(
-                        value = value,
+                        die = value,
                         center = Offset(
                             x = startX + index * (layout.dieSize + layout.dieSpacing.toPx()),
                             y = layout.centerY

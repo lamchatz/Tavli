@@ -1,11 +1,11 @@
 package alex.se.gamaw.tavli.connection
 
-import kotlin.random.Random
-import kotlin.random.nextInt
+import alex.se.gamaw.tavli.data.Die
+import java.security.SecureRandom
 
 class LocalConnection : Connection {
-    val random = Random(System.currentTimeMillis())
-    override fun getDice(): List<Int> {
-        return listOf(random.nextInt(1,6), random.nextInt(1,6))
+    val random = SecureRandom()
+    override fun getDice(): List<Die> {
+        return listOf(Die(random.nextInt(6) + 1), Die(random.nextInt(6) + 1))
     }
 }

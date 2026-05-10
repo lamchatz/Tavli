@@ -1,6 +1,7 @@
 package alex.se.gamaw.tavli.gamemode
 
 import alex.se.gamaw.tavli.data.BarIndex
+import alex.se.gamaw.tavli.data.Die
 import alex.se.gamaw.tavli.data.Piece
 import androidx.compose.ui.graphics.Color
 
@@ -44,7 +45,8 @@ class PortesMode() : GameMode {
 
     override fun getLegalMoves(
         selectedPiece: Piece,
-        boardState: Map<Int, List<Piece>>
+        boardState: Map<Int, List<Piece>>,
+        dice: List<Die>
     ): Set<Int> {
         val myColor = selectedPiece.color
         val barIndex = if (myColor == Color.White) BarIndex.WHITE.value else BarIndex.BLACK.value
@@ -53,11 +55,21 @@ class PortesMode() : GameMode {
             return emptySet()
         }
 
+        val availableDiceValues = dice.filter { !it.played }.map { it.value }
+
         val possibleRange = when {
-            selectedPiece.position == BarIndex.WHITE.value -> (18..23)
-            selectedPiece.position == BarIndex.BLACK.value -> (0..5)
-            myColor == Color.White -> (selectedPiece.position - 1 downTo 0)
-            else -> (selectedPiece.position + 1..23)
+            selectedPiece.position == BarIndex.WHITE.value -> {
+                availableDiceValues.map { BarIndex.WHITE.value - it }
+            }
+            selectedPiece.position == BarIndex.BLACK.value -> {
+                availableDiceValues.map { BarIndex.BLACK.value + it }
+            }
+            myColor == Color.White -> {
+                availableDiceValues.map { selectedPiece.position - it }
+            }
+            else -> {
+                availableDiceValues.map { selectedPiece.position + it }
+            }
         }
 
         return possibleRange.filterTo(mutableSetOf()) { targetIndex ->
@@ -80,7 +92,7 @@ class PortesMode() : GameMode {
     override fun hasLegalMove(
         boardState: Map<Int, List<Piece>>,
         color: Color,
-        dices: List<Int>
+        dice: List<Die>
     ): Boolean {
         val barIndex = if (color == Color.White) BarIndex.WHITE.value else BarIndex.BLACK.value
         val piecesOnBar = boardState[barIndex].orEmpty()
@@ -96,8 +108,8 @@ class PortesMode() : GameMode {
         val moveFactor = if (color == Color.White) -1 else 1
 
         for (pos in startingPositions) {
-            for (dice in dices) {
-                val targetIndex = pos + (moveFactor * dice)
+            for (dice in dice) {
+                val targetIndex = pos + (moveFactor * dice.value)
 
                 if (targetIndex in 0..23) {
                     if (isLegalMove(boardState[targetIndex].orEmpty(), color)) {
