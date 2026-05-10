@@ -1,5 +1,6 @@
 package alex.se.gamaw.tavli.composables
 
+import alex.se.gamaw.tavli.data.BarIndex
 import alex.se.gamaw.tavli.data.Board
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.calculateBoardLayout
@@ -58,6 +59,7 @@ fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
     }
 }
 
+
 @Composable
 fun Board(
     boardViewModel: BoardViewModel
@@ -100,7 +102,6 @@ fun Board(
                                 piecesByPosition.value
                             )
                         )
-                        println(boardViewModel.hasLegalMove())
                     }
                 }
         ) {
@@ -112,36 +113,55 @@ fun Board(
                 if (highlights.value.contains(index)) {
                     drawPath(
                         path = point.path,
-                        color = Color.Yellow.copy(alpha = 0.4f), // Semi-transparent glow
+                        color = Color.Yellow.copy(alpha = 0.4f),
                         style = Fill
                     )
                     drawPath(
                         path = point.path,
                         color = Color.Yellow,
-                        style = Stroke(width = 4.dp.toPx()) // Sharp outline
+                        style = Stroke(width = 4.dp.toPx())
                     )
                 }
 
                 if (selectedPoint.value == index) {
                     drawPath(
                         path = point.path,
-                        color = Color.Magenta.copy(alpha = 0.4f), // Semi-transparent glow
+                        color = Color.Magenta.copy(alpha = 0.4f),
                         style = Fill
                     )
                     drawPath(
                         path = point.path,
                         color = Color.Magenta,
-                        style = Stroke(width = 4.dp.toPx()) // Sharp outline
+                        style = Stroke(width = 4.dp.toPx())
                     )
                 }
             }
-
-            // 3. Draw Bar
+// 3. Draw Bar
             drawRect(
                 color = barColor,
                 topLeft = Offset(layout.sideWidth, 0f),
                 size = Size(layout.barWidth, height)
             )
+
+// 3b. Draw Bar Pieces
+            val whiteBarPieces = piecesByPosition.value[BarIndex.WHITE.value] ?: emptyList()
+            val blackBarPieces = piecesByPosition.value[BarIndex.BLACK.value] ?: emptyList()
+
+            whiteBarPieces.forEachIndexed { index, piece ->
+                drawCircle(
+                    color = piece.color,
+                    radius = layout.pieceRadius,
+                    center = Offset(layout.barCenterX, layout.barWhiteY + (index * layout.spacing))
+                )
+            }
+
+            blackBarPieces.forEachIndexed { index, piece ->
+                drawCircle(
+                    color = piece.color,
+                    radius = layout.pieceRadius,
+                    center = Offset(layout.barCenterX, layout.barBlackY - (index * layout.spacing))
+                )
+            }
 
             // 4. Draw Pieces (Using the pre-grouped map)
             piecesByPosition.value.forEach { (index, stack) ->
@@ -172,7 +192,27 @@ fun findClickedIndex(
     piecesByPosition: Map<Int, List<Piece>>
 ): Int? {
 
+    val whiteBarPieces = piecesByPosition[BarIndex.WHITE.value] ?: emptyList()
+    whiteBarPieces.forEachIndexed { index, _ ->
+        val pieceCenter = Offset(
+            layout.barCenterX,
+            layout.barWhiteY + (index * layout.spacing)
+        )
+        if ((offset - pieceCenter).getDistance() <= layout.pieceRadius) return BarIndex.WHITE.value
+    }
+
+    val blackBarPieces = piecesByPosition[BarIndex.BLACK.value] ?: emptyList()
+    blackBarPieces.forEachIndexed { index, _ ->
+        val pieceCenter = Offset(
+            layout.barCenterX,
+            layout.barBlackY - (index * layout.spacing)
+        )
+        if ((offset - pieceCenter).getDistance() <= layout.pieceRadius) return BarIndex.BLACK.value
+    }
+
     piecesByPosition.forEach { (index, stack) ->
+        if (index == BarIndex.WHITE.value || index == BarIndex.BLACK.value) return@forEach
+
         val point = layout.pointLayouts[index] ?: return@forEach
         stack.forEachIndexed { stackIndex, _ ->
             val pieceY = if (point.isTop) {
@@ -198,7 +238,7 @@ fun findClickedIndex(
     val pointWidth = sideWidth / 6f
 
     return when {
-        !isTopZone && !isBottomZone -> null // Tapped the middle "dead zone"
+        !isTopZone && !isBottomZone -> null
         x < sideWidth -> {
             val column = (x / pointWidth).toInt().coerceIn(0, 5)
             val reversed = 5 - column

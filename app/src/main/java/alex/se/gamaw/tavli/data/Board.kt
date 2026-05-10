@@ -8,7 +8,10 @@ data class Board(
     val barWidth: Float,
     val pointWidth: Float,
     val pieceRadius: Float,
-    val spacing: Float
+    val spacing: Float,
+    val barCenterX: Float,
+    val barWhiteY: Float,
+    val barBlackY: Float
 )
 
 
@@ -28,7 +31,6 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
             if (isLeftSide) localIndex * pointWidth else sideWidth + barWidth + localIndex * pointWidth
         val centerX = x + pointWidth / 2f
 
-        // Top points (Indices 11 down to 0)
         val topIndex = 11 - i
         layouts[topIndex] = Point(
             path = Path().apply {
@@ -37,7 +39,6 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
             centerX = centerX, isTop = true, isLight = i % 2 == 0
         )
 
-        // Bottom points (Indices 12 up to 23)
         val bottomIndex = 12 + i
         layouts[bottomIndex] = Point(
             path = Path().apply {
@@ -50,6 +51,13 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
         )
     }
 
-    return Board(layouts, sideWidth, barWidth, pointWidth, pieceRadius, pieceRadius * 2.1f)
+    val barCenterX = sideWidth + (barWidth / 2f)
+    val barWhiteY = height * 0.25f
+    val barBlackY = height * 0.75f
+
+    return Board(
+        layouts, sideWidth, barWidth, pointWidth, pieceRadius, pieceRadius * 2.1f,
+        barCenterX, barWhiteY, barBlackY
+    )
 }
 

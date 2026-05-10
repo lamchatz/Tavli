@@ -77,6 +77,7 @@ class BoardViewModel : ViewModel() {
             _selectedPoint.value = clickedPosition
 
             _allowedMoves.value = gameMode.getLegalMoves(selectedPiece, _piecesByPosition.value)
+            println(gameMode.hasLegalMove(_piecesByPosition.value, Color.White, listOf(6,6)))
         }
     }
 

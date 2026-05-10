@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
     fun Prev() {
 
         TavliTheme {
-//            GameScreen()
+            GameScreen()
         }
     }
 }
