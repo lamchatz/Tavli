@@ -1,5 +1,6 @@
 package alex.se.gamaw.tavli.viewmodel
 
+import alex.se.gamaw.tavli.connection.Connection
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.gamemode.GameMode
 import androidx.compose.ui.graphics.Color
@@ -20,10 +21,19 @@ class BoardViewModel : ViewModel() {
     val allowedMoves: StateFlow<Set<Int>> = _allowedMoves.asStateFlow()
 
     private lateinit var gameMode: GameMode
+    private lateinit var connection: Connection
+
+    private val _dice = MutableStateFlow<List<Int>>(emptyList())
+    val dice = _dice.asStateFlow()
 
     fun setGameMode(gameMode: GameMode) {
         this.gameMode = gameMode
         this.setInitialBoard(gameMode.initialBoard())
+    }
+
+    fun setConnection(connection: Connection) {
+        this.connection = connection
+        _dice.value = connection.getDice()
     }
 
     private fun setInitialBoard(pieces: List<Piece>) {
@@ -49,6 +59,9 @@ class BoardViewModel : ViewModel() {
 
         _piecesByPosition.value = gameMode.resolveMove(_piecesByPosition.value, from, to)
 
+
+        _dice.value = connection.getDice()
+        println("Dice: ${_dice.value}")
          _selectedPoint.value = null
         _allowedMoves.value = emptySet()
     }

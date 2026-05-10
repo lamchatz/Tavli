@@ -1,5 +1,6 @@
 package alex.se.gamaw.tavli.composables
 
+import alex.se.gamaw.tavli.connection.LocalConnection
 import alex.se.gamaw.tavli.data.BarIndex
 import alex.se.gamaw.tavli.data.Board
 import alex.se.gamaw.tavli.data.Piece
@@ -47,6 +48,7 @@ val barColor = Color(0xFF4E2A17)
 fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
 
     boardViewModel.setGameMode(PortesMode())
+    boardViewModel.setConnection(LocalConnection())
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -67,6 +69,7 @@ fun Board(
     val piecesByPosition = boardViewModel.piecesByPosition.collectAsStateWithLifecycle()
     val highlights = boardViewModel.allowedMoves.collectAsStateWithLifecycle()
     val selectedPoint = boardViewModel.selectedPoint.collectAsStateWithLifecycle()
+    val dice = boardViewModel.dice.collectAsStateWithLifecycle()
 
     BoxWithConstraints(
         modifier = Modifier
@@ -178,6 +181,23 @@ fun Board(
                         color = piece.color,
                         radius = layout.pieceRadius,
                         center = Offset(point.centerX, y)
+                    )
+                }
+            }
+
+            val diceValues = dice.value
+            if (diceValues.isNotEmpty()) {
+                val startX =
+                    layout.leftSideCenterX - (layout.diceWidth / 2f) + (layout.dieSize / 2f)
+
+                diceValues.forEachIndexed { index, value ->
+                    drawDie(
+                        value = value,
+                        center = Offset(
+                            x = startX + index * (layout.dieSize + layout.dieSpacing.toPx()),
+                            y = layout.centerY
+                        ),
+                        dieSize = layout.dieSize
                     )
                 }
             }

@@ -1,6 +1,8 @@
 package alex.se.gamaw.tavli.data
 
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 data class Board(
     val pointLayouts: Map<Int, Point>,
@@ -11,7 +13,13 @@ data class Board(
     val spacing: Float,
     val barCenterX: Float,
     val barWhiteY: Float,
-    val barBlackY: Float
+    val barBlackY: Float,
+    val centerY: Float,
+    val rightSideCenterX: Float,
+    val leftSideCenterX: Float,
+    val diceWidth: Float,
+    val dieSize: Float,
+    val dieSpacing: Dp
 )
 
 
@@ -54,10 +62,29 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
     val barCenterX = sideWidth + (barWidth / 2f)
     val barWhiteY = height * 0.25f
     val barBlackY = height * 0.75f
+    val rightSideCenterX = sideWidth + barWidth + (sideWidth / 2f)
+    val leftSideCenterX = sideWidth / 2f
+    val dieSize = pointWidth * 1.2f
+    val dieSpacing = 8.dp
+
+    val diceWidth = 2 * dieSize + dieSpacing.value
 
     return Board(
-        layouts, sideWidth, barWidth, pointWidth, pieceRadius, pieceRadius * 2.1f,
-        barCenterX, barWhiteY, barBlackY
+        layouts,
+        sideWidth,
+        barWidth,
+        pointWidth,
+        pieceRadius,
+        pieceRadius * 2.1f,
+        barCenterX,
+        barWhiteY,
+        barBlackY,
+        height / 2f,
+        rightSideCenterX,
+        leftSideCenterX,
+        diceWidth,
+        dieSize,
+        dieSpacing
     )
 }
 
