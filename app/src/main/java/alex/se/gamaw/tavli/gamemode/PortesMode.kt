@@ -17,9 +17,9 @@ class PortesMode() : GameMode {
             Piece(7, 7, Color.White),
             Piece(8, 12, Color.White),
             Piece(9, 12, Color.White),
-            Piece(10, BarIndex.WHITE.value, Color.White),
-            Piece(11, BarIndex.WHITE.value, Color.White),
-            Piece(12, BarIndex.WHITE.value, Color.White),
+            Piece(10, 12, Color.White),
+            Piece(11, 12, Color.White),
+            Piece(12, 12, Color.White),
             Piece(13, 23, Color.White),
             Piece(14, 23, Color.White),
 
@@ -29,23 +29,16 @@ class PortesMode() : GameMode {
             Piece(17, 18, Color.Black),
             Piece(18, 18, Color.Black),
             Piece(19, 18, Color.Black),
-            Piece(21, BarIndex.BLACK.value, Color.Black)
-//
-//            Piece(15, 18, Color.Black),
-//            Piece(16, 18, Color.Black),
-//            Piece(17, 18, Color.Black),
-//            Piece(18, 18, Color.Black),
-//            Piece(19, 18, Color.Black),
-//            Piece(20, 16, Color.Black),
-//            Piece(21, 16, Color.Black),
-//            Piece(22, 16, Color.Black),
-//            Piece(23, 11, Color.Black),
-//            Piece(24, 11, Color.Black),
-//            Piece(25, 11, Color.Black),
-//            Piece(26, 11, Color.Black),
-//            Piece(27, 11, Color.Black),
-//            Piece(28, 0, Color.Black),
-//            Piece(29, 0, Color.Black),
+            Piece(20, 16, Color.Black),
+            Piece(21, 16, Color.Black),
+            Piece(22, 16, Color.Black),
+            Piece(23, 11, Color.Black),
+            Piece(24, 11, Color.Black),
+            Piece(25, 11, Color.Black),
+            Piece(26, 11, Color.Black),
+            Piece(27, 11, Color.Black),
+            Piece(28, 0, Color.Black),
+            Piece(29, 0, Color.Black),
         )
     }
 
@@ -115,5 +108,43 @@ class PortesMode() : GameMode {
         }
 
         return false
+    }
+
+    override fun resolveMove(
+        boardState: Map<Int, List<Piece>>,
+        from: Int,
+        to: Int
+    ): Map<Int, List<Piece>> {
+        val fromList = boardState[from].orEmpty()
+        if (fromList.isEmpty()) return boardState
+
+        val toList = boardState[to].orEmpty()
+        val pieceToMove = fromList.last().copy(position = to)
+
+        if (!isLegalMove(boardState[from].orEmpty(), pieceToMove.color)) return boardState
+
+        if (toList.isEmpty()) {
+            return boardState + mapOf(
+                from to fromList.dropLast(1),
+                to to toList + pieceToMove
+            )
+        }
+
+        val pieceToLand = toList.last()
+        val barIndex =
+            if (Color.White == pieceToMove.color) BarIndex.BLACK.value else BarIndex.WHITE.value
+
+        if (pieceToLand.color != pieceToMove.color) {
+            return boardState + mapOf(
+                from to fromList.dropLast(1),
+                to to toList.dropLast(1) + pieceToMove,
+                barIndex to boardState[barIndex].orEmpty() + pieceToLand.copy(position = barIndex)
+            )
+        }
+
+        return boardState + mapOf(
+            from to fromList.dropLast(1),
+            to to toList + pieceToMove
+        )
     }
 }

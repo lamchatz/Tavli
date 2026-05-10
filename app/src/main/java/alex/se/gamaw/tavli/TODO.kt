@@ -10,8 +10,7 @@ package alex.se.gamaw.tavli
 // time limit for each move?
 //TODO resign menu (Mono Diplo)
 
-//TODO bar! move pieces to and from.
-//TODO resolve hit, mazema
+//TODO mazema
 //TODO skip turn if no legalMoves
 
 //TODO fevga

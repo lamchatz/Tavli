@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
 class BoardViewModel : ViewModel() {
 
@@ -48,25 +47,10 @@ class BoardViewModel : ViewModel() {
 
         println("We are going from ${_selectedPoint.value} to $to")
 
-        _piecesByPosition.update { currentMap ->
-            val oldList = currentMap[from].orEmpty()
+        _piecesByPosition.value = gameMode.resolveMove(_piecesByPosition.value, from, to)
 
-            if (oldList.isNotEmpty()) {
-                val pieceToMove = oldList.last().copy(position = to)
-                val updatedOldList = oldList.dropLast(1)
-                val updatedNewList = currentMap[to].orEmpty() + pieceToMove
-
-                currentMap + mapOf(
-                    from to updatedOldList,
-                    to to updatedNewList
-                )
-            } else {
-                currentMap
-            }
-        }
-        _selectedPoint.value = null
+         _selectedPoint.value = null
         _allowedMoves.value = emptySet()
-
     }
 
     private fun generateLegalMoves(clickedPosition: Int?) {
