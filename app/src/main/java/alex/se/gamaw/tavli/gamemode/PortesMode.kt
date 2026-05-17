@@ -45,9 +45,9 @@ class PortesMode() : GameMode {
     }
 
     override fun getLegalMoves(
-        selectedPiece: Piece,
         boardState: Map<Int, List<Piece>>,
-        dice: List<Die>
+        selectedPiece: Piece,
+        movePool: List<Int>
     ): Set<Int> {
         val myColor = selectedPiece.color
         val barIndex = if (myColor == Color.White) BarIndex.WHITE.value else BarIndex.BLACK.value
@@ -57,23 +57,21 @@ class PortesMode() : GameMode {
             return emptySet()
         }
 
-        val availableDiceValues = dice.filter { !it.played }.map { it.value }
-
         val possibleRange = when {
             position == BarIndex.WHITE.value -> {
-                availableDiceValues.map { BarIndex.WHITE.value - it }
+                movePool.map { BarIndex.WHITE.value - it }
             }
 
             position == BarIndex.BLACK.value -> {
-                availableDiceValues.map { BarIndex.BLACK.value + it }
+                movePool.map { BarIndex.BLACK.value + it }
             }
 
             myColor == Color.White -> {
-                availableDiceValues.map { position - it }
+                movePool.map { position - it }
             }
 
             else -> {
-                availableDiceValues.map { position + it }
+                movePool.map { position + it }
             }
         }
 
@@ -81,35 +79,41 @@ class PortesMode() : GameMode {
             isLegalMove(boardState[targetIndex].orEmpty(), myColor)
         }
 
-        return singleMoves + getCombinationMoves(availableDiceValues, myColor, position, boardState)
+        return singleMoves + getCombinationMoves(movePool, myColor, position, boardState)
     }
 
     private fun getCombinationMoves(
-        availableDiceValues: List<Int>,
+        movePool: List<Int>,
         myColor: Color,
         position: Int,
         boardState: Map<Int, List<Piece>>,
     ): Set<Int> {
+        if (movePool.size < 2) return emptySet()
+
+        val direction = if (myColor == Color.White) -1 else 1
         val combinedMoves = mutableSetOf<Int>()
-        if (availableDiceValues.size == 2) {
-            val direction = if (myColor == Color.White) -1 else 1
 
-            val d1 = availableDiceValues[0]
-            val d2 = availableDiceValues[1]
-            val intermediate1 = position + (d1 * direction)
-            val intermediate2 = position + (d2 * direction)
-            val finalTarget = position + (d1 + d2) * direction
-            val path1Valid = isLegalMove(boardState[intermediate1].orEmpty(), myColor) &&
-                    isLegalMove(boardState[finalTarget].orEmpty(), myColor)
+        fun explore(currentPos: Int, remainingDice: List<Int>, stepsTaken: Int) {
+            // If we've moved 2 or more steps combined, the final landing spot is valid
+            if (stepsTaken >= 2) {
+                combinedMoves.add(currentPos)
+            }
 
-            val path2Valid = isLegalMove(boardState[intermediate2].orEmpty(), myColor) &&
-                    isLegalMove(boardState[finalTarget].orEmpty(), myColor)
+            // Try using each available move as the next step
+            // Using distinct() ensures we don't recalculate identical dice (doubles)
+            val uniqueDice = remainingDice.distinct()
+            for (die in uniqueDice) {
+                val nextPos = currentPos + (die * direction)
 
-            if (path1Valid || path2Valid) {
-                combinedMoves.add(finalTarget)
+                // If the landing spot is legal, continue moving down this path
+                if (isLegalMove(boardState[nextPos].orEmpty(), myColor)) {
+                    val nextRemaining = remainingDice.toMutableList().apply { remove(die) }
+                    explore(nextPos, nextRemaining, stepsTaken + 1)
+                }
             }
         }
 
+        explore(position, movePool, 0)
         return combinedMoves
     }
 
@@ -128,7 +132,7 @@ class PortesMode() : GameMode {
     override fun hasLegalMove(
         boardState: Map<Int, List<Piece>>,
         color: Color,
-        dice: List<Die>
+        movePool: List<Int>
     ): Boolean {
         val barIndex = if (color == Color.White) BarIndex.WHITE.value else BarIndex.BLACK.value
         val piecesOnBar = boardState[barIndex].orEmpty()
@@ -144,8 +148,8 @@ class PortesMode() : GameMode {
         val direction = if (color == Color.White) -1 else 1
 
         for (pos in startingPositions) {
-            for (dice in dice) {
-                val targetIndex = pos + (direction * dice.value)
+            for (move in movePool) {
+                val targetIndex = pos + (direction * move)
 
                 if (targetIndex in 0..23) {
                     if (isLegalMove(boardState[targetIndex].orEmpty(), color)) {
@@ -162,37 +166,62 @@ class PortesMode() : GameMode {
         boardState: Map<Int, List<Piece>>,
         from: Int,
         to: Int,
-        dice: List<Die>
+        movePool: List<Int>,
     ): Map<Int, List<Piece>> {
+        val movesLeft = movePool.size
+        if (movesLeft == 0) return boardState
+
         val fromList = boardState[from].orEmpty()
         if (fromList.isEmpty()) return boardState
 
         val color = fromList.last().color
         var chosenIntermediate = to
 
-        if (abs(to - from) > 6) {
-            val direction = if (color == Color.White) -1 else 1
+        val direction = if (color == Color.White) -1 else 1
 
-            val intermediate0 = boardState[from + (dice[0].value * direction)].orEmpty()
-            val intermediate1 = boardState[from + (dice[1].value * direction)].orEmpty()
-
-            if (intermediate0.isNotEmpty() && intermediate0.size == 1) {
-                val c = intermediate0.last().color
-                if (color != c) {
-                    chosenIntermediate = from + (dice[0].value * direction)
+        if (movesLeft == 2) {
+            if (abs(to - from) == movePool.sumOf { it }) {
+                // check if an opponent's piece can be hit
+                for (move in movePool) {
+                    val s = from + (move * direction)
+                    if (hitsOpponent(boardState[s].orEmpty(), color)) {
+                        chosenIntermediate = s
+                        break
+                    }
                 }
 
-            } else if (intermediate1.isNotEmpty() && intermediate1.size == 1) {
-                val c = intermediate1.last().color
-                if (color != c) {
-                    chosenIntermediate = from + (dice[1].value * direction)
+                if (chosenIntermediate != to) {
+                    val intermediateState = resolveSingleMove(boardState, from, chosenIntermediate)
+                    return resolveSingleMove(intermediateState, chosenIntermediate, to)
+                }
+                // if not found, just go to the original selected position, no worries
+            }
+        } else if (movesLeft > 2) {
+            val steps = mutableSetOf<Int>()
+            var step = from
+            for (move in movePool) {
+                step += (move * direction)
+                if (step > to) break
+                if (hitsOpponent(boardState[step].orEmpty(), color)) {
+                    steps.add(step)
                 }
             }
 
-            if (chosenIntermediate != to) {
-                val intermediateState = resolveSingleMove(boardState, from, chosenIntermediate)
-                return resolveSingleMove(intermediateState, chosenIntermediate, to)
+            if (steps.isEmpty()) {
+                return resolveSingleMove(boardState, from, to)
             }
+
+            var startingPosition = from
+            var intermediateState = boardState
+            for (step in steps) {
+                intermediateState = resolveSingleMove(intermediateState, startingPosition, step)
+                startingPosition = step
+            }
+
+            if (startingPosition == to) {
+                return intermediateState
+            }
+            return resolveSingleMove(intermediateState, steps.last(), to)
         }
 
         return resolveSingleMove(boardState, from, to)
@@ -232,5 +261,12 @@ class PortesMode() : GameMode {
             from to fromList.dropLast(1),
             to to toList + pieceToMove
         )
+    }
+
+    private fun hitsOpponent(positionToGo: List<Piece>, color: Color): Boolean {
+        if (positionToGo.isNotEmpty() && positionToGo.size == 1) {
+            return color != positionToGo.last().color
+        }
+        return false
     }
 }

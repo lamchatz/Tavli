@@ -3,6 +3,7 @@ package alex.se.gamaw.tavli.viewmodel
 import alex.se.gamaw.tavli.connection.Connection
 import alex.se.gamaw.tavli.data.Die
 import alex.se.gamaw.tavli.data.Piece
+import alex.se.gamaw.tavli.data.Player
 import alex.se.gamaw.tavli.gamemode.GameMode
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -22,13 +23,16 @@ class BoardViewModel : ViewModel() {
     private val _allowedMoves = MutableStateFlow<Set<Int>>(emptySet())
     val allowedMoves: StateFlow<Set<Int>> = _allowedMoves.asStateFlow()
 
+    private val _player = MutableStateFlow<Player?>(null)
+    val player = _player.asStateFlow()
+
     private lateinit var gameMode: GameMode
     private lateinit var connection: Connection
 
     private val _dice = MutableStateFlow(listOf(Die(4), Die(3)))
     val dice = _dice.asStateFlow()
 
-    private var numberOfMoves = 0
+    private val _movePool = MutableStateFlow<List<Int>>(emptyList())
 
     fun setGameMode(gameMode: GameMode) {
         this.gameMode = gameMode
@@ -37,7 +41,7 @@ class BoardViewModel : ViewModel() {
 
     fun setConnection(connection: Connection) {
         this.connection = connection
-//        _dice.value = connection.getDice()
+        nextRound()
     }
 
     private fun setInitialBoard(pieces: List<Piece>) {
@@ -61,9 +65,9 @@ class BoardViewModel : ViewModel() {
 
         println("We are going from ${_selectedPoint.value} to $to")
 
-        _piecesByPosition.value = gameMode.resolveMove(_piecesByPosition.value, from, to, _dice.value)
+        _piecesByPosition.value =
+            gameMode.resolveMove(_piecesByPosition.value, from, to, _movePool.value)
 
-        numberOfMoves++
         markDieAsPlayed(abs(to - from))
 
         _selectedPoint.value = null
@@ -73,17 +77,20 @@ class BoardViewModel : ViewModel() {
     private fun generateLegalMoves(clickedPosition: Int?) {
         val selectedPiece = _piecesByPosition.value[clickedPosition]?.lastOrNull()
         if (selectedPiece != null) {
+            if (selectedPiece.color != _player.value?.color) {
+                return
+            }
             println("Selected: $clickedPosition. We have to go somewhere")
 
             _selectedPoint.value = clickedPosition
 
             _allowedMoves.value =
-                gameMode.getLegalMoves(selectedPiece, _piecesByPosition.value, _dice.value)
+                gameMode.getLegalMoves( _piecesByPosition.value, selectedPiece, _movePool.value)
         }
     }
 
     fun hasLegalMove(): Boolean {
-        return gameMode.hasLegalMove(_piecesByPosition.value, Color.Black, _dice.value)
+        return gameMode.hasLegalMove(_piecesByPosition.value, Color.Black, _movePool.value)
     }
 
     fun processInput(clickedPosition: Int?) {
@@ -101,7 +108,7 @@ class BoardViewModel : ViewModel() {
             moveTo(clickedPosition)
             if (roundCompleted()) {
                 nextRound()
-                while(!hasLegalMove()) {
+                while (!hasLegalMove()) {
                     nextRound()
                 }
             }
@@ -111,8 +118,10 @@ class BoardViewModel : ViewModel() {
     }
 
     private fun nextRound() {
-        numberOfMoves = 0
-        _dice.value = connection.getDice()
+        val nextState = connection.nextRound()
+        _dice.value = nextState.dice
+        _player.value = nextState.player
+        _movePool.value = nextState.movePool
     }
 
     private fun areDiceDouble(): Boolean {
@@ -120,23 +129,34 @@ class BoardViewModel : ViewModel() {
     }
 
     private fun roundCompleted(): Boolean {
-        return _dice.value[0].played && _dice.value[1].played
+        return _movePool.value.isEmpty()
     }
 
     private fun markDieAsPlayed(move: Int) {
-        if (move > 6) {
-            _dice.value[0].played = true
-            _dice.value[1].played = true
-        }
-        if (areDiceDouble()) {
-            if (numberOfMoves == 2) {
-                _dice.value[0].played = true
-            } else if (numberOfMoves == 4) {
-                _dice.value[1].played = true
-            }
+        val doubleDice = areDiceDouble()
+        val movesSum = _movePool.value.sumOf { it }
+
+        if (doubleDice) {
+            val d1 = _dice.value[0].value
+            val diceUsed = move / d1
+
+            _movePool.value = _movePool.value.drop(diceUsed)
+
+            val movesLeft = _movePool.value.size
+            if (movesLeft < 3) _dice.value[0].played = true
+            if (movesLeft == 0) _dice.value[1].played = true
 
         } else {
-            _dice.value.find { it.value == move && !it.played }?.played = true
+            if (move == movesSum) {
+                _dice.value.forEach { it.played = true }
+                _movePool.value = emptyList()
+            } else {
+                _dice.value.find { it.value == move && !it.played }?.played = true
+
+                val currentPool = _movePool.value.toMutableList()
+                currentPool.remove(move)
+                _movePool.value = currentPool
+            }
         }
     }
 }

@@ -1,11 +1,9 @@
 package alex.se.gamaw.tavli.composables
 
-import alex.se.gamaw.tavli.connection.LocalConnection
 import alex.se.gamaw.tavli.data.BarIndex
 import alex.se.gamaw.tavli.data.Board
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.calculateBoardLayout
-import alex.se.gamaw.tavli.gamemode.PortesMode
 import alex.se.gamaw.tavli.viewmodel.BoardViewModel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,10 +11,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,7 +34,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 val boardBrush = Brush.verticalGradient(
     0.0f to Color(0xFF5D3A1A),
@@ -45,22 +46,32 @@ val darkTriangle = Color(0xFF5C2E1A)
 val barColor = Color(0xFF4E2A17)
 
 @Composable
-fun GameScreen(boardViewModel: BoardViewModel = viewModel()) {
+fun GameScreen(boardViewModel: BoardViewModel) {
+    val currentPlayer = boardViewModel.player.collectAsStateWithLifecycle()
 
-    boardViewModel.setGameMode(PortesMode())
-    boardViewModel.setConnection(LocalConnection())
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(boardBrush),
-        contentAlignment = Alignment.Center
-    ) {
-        Board(
-            boardViewModel = boardViewModel
-        )
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(boardBrush)) {
+        Box(Modifier
+            .fillMaxWidth()
+            .padding(top = 32.dp), contentAlignment = Alignment.Center) {
+            val name = currentPlayer.value?.name ?: "Hold On"
+            Text(text = name, color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            Board(
+                boardViewModel = boardViewModel
+            )
+        }
     }
-}
 
+}
 
 @Composable
 fun Board(

@@ -1,6 +1,7 @@
 package alex.se.gamaw.tavli
 
-//TODO dice, diples
+//TODO mazema
+//TODO skip turn if no legalMoves!
 
 //TODO Select Game Mode menu
 //TODO Select Connection Mode menu
@@ -9,9 +10,6 @@ package alex.se.gamaw.tavli
 //TODO Game UI, Name: Score for each player, resign (confirm with other player for mono/diplo), Option to change game mode,
 // time limit for each move?
 //TODO resign menu (Mono Diplo)
-
-//TODO mazema
-//TODO skip turn if no legalMoves
 
 //TODO fevga
 //TODO plakoto
