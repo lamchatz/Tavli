@@ -1,10 +1,11 @@
 package alex.se.gamaw.tavli.connection
 
-import alex.se.gamaw.tavli.composables.GameState
 import alex.se.gamaw.tavli.data.Die
+import alex.se.gamaw.tavli.data.TurnData
+import kotlinx.coroutines.flow.Flow
 
 interface Connection {
-    fun getDice(): List<Die>
+    val turnUpdates: Flow<TurnData>
 
-    fun nextRound(): GameState
+    suspend fun sendTurnData(turnData: TurnData)
 }

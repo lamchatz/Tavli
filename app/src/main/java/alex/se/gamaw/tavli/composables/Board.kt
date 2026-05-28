@@ -2,6 +2,7 @@ package alex.se.gamaw.tavli.composables
 
 import alex.se.gamaw.tavli.data.BarIndex
 import alex.se.gamaw.tavli.data.Board
+import alex.se.gamaw.tavli.data.GameState
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.calculateBoardLayout
 import alex.se.gamaw.tavli.viewmodel.BoardViewModel
@@ -47,15 +48,19 @@ val barColor = Color(0xFF4E2A17)
 
 @Composable
 fun GameScreen(boardViewModel: BoardViewModel) {
-    val currentPlayer = boardViewModel.player.collectAsStateWithLifecycle()
+    val gameState = boardViewModel.gameState.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .background(boardBrush)) {
-        Box(Modifier
-            .fillMaxWidth()
-            .padding(top = 32.dp), contentAlignment = Alignment.Center) {
-            val name = currentPlayer.value?.name ?: "Hold On"
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(boardBrush)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 32.dp), contentAlignment = Alignment.Center
+        ) {
+            val name = gameState.value.currentPlayer?.name ?: "Hold On"
             Text(text = name, color = Color.White, style = MaterialTheme.typography.headlineMedium)
         }
 
@@ -66,7 +71,17 @@ fun GameScreen(boardViewModel: BoardViewModel) {
             contentAlignment = Alignment.Center
         ) {
             Board(
-                boardViewModel = boardViewModel
+                gameState = gameState.value,
+                processInput = { offset, size, layout ->
+                    boardViewModel.processInput(
+                        findClickedIndex(
+                            offset,
+                            size = size,
+                            layout,
+                            gameState.value.piecesByPosition
+                        )
+                    )
+                }
             )
         }
     }
@@ -75,13 +90,9 @@ fun GameScreen(boardViewModel: BoardViewModel) {
 
 @Composable
 fun Board(
-    boardViewModel: BoardViewModel
+    gameState: GameState,
+    processInput: (Offset, IntSize, Board) -> Unit
 ) {
-    val piecesByPosition = boardViewModel.piecesByPosition.collectAsStateWithLifecycle()
-    val highlights = boardViewModel.allowedMoves.collectAsStateWithLifecycle()
-    val selectedPoint = boardViewModel.selectedPoint.collectAsStateWithLifecycle()
-    val dice = boardViewModel.dice.collectAsStateWithLifecycle()
-
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxHeight(0.75f)
@@ -108,14 +119,7 @@ fun Board(
                 .fillMaxSize()
                 .pointerInput(width, height) {
                     detectTapGestures { offset ->
-                        boardViewModel.processInput(
-                            findClickedIndex(
-                                offset,
-                                size = size,
-                                layout,
-                                piecesByPosition.value
-                            )
-                        )
+                        processInput(offset, size, layout)
                     }
                 }
         ) {
@@ -124,7 +128,7 @@ fun Board(
                 val color = if (point.isLight) lightTriangle else darkTriangle
                 drawPath(path = point.path, color = color)
 
-                if (highlights.value.contains(index)) {
+                if (gameState.allowedMoves.contains(index)) {
                     drawPath(
                         path = point.path,
                         color = Color.Yellow.copy(alpha = 0.4f),
@@ -137,7 +141,7 @@ fun Board(
                     )
                 }
 
-                if (selectedPoint.value == index) {
+                if (gameState.selectedPoint == index) {
                     drawPath(
                         path = point.path,
                         color = Color.Magenta.copy(alpha = 0.4f),
@@ -158,8 +162,8 @@ fun Board(
             )
 
 // 3b. Draw Bar Pieces
-            val whiteBarPieces = piecesByPosition.value[BarIndex.WHITE.value] ?: emptyList()
-            val blackBarPieces = piecesByPosition.value[BarIndex.BLACK.value] ?: emptyList()
+            val whiteBarPieces = gameState.piecesByPosition[BarIndex.WHITE.value] ?: emptyList()
+            val blackBarPieces = gameState.piecesByPosition[BarIndex.BLACK.value] ?: emptyList()
 
             whiteBarPieces.forEachIndexed { index, piece ->
                 drawCircle(
@@ -178,7 +182,7 @@ fun Board(
             }
 
             // 4. Draw Pieces (Using the pre-grouped map)
-            piecesByPosition.value.forEach { (index, stack) ->
+            gameState.piecesByPosition.forEach { (index, stack) ->
                 val point = layout.pointLayouts[index] ?: return@forEach
 
                 stack.forEachIndexed { stackIndex, piece ->
@@ -196,10 +200,12 @@ fun Board(
                 }
             }
 
-            val diceValues = dice.value
+            val diceValues = gameState.dice
             if (diceValues.isNotEmpty()) {
+                val side =
+                    if (gameState.showRight) layout.rightSideCenterX else layout.leftSideCenterX
                 val startX =
-                    layout.leftSideCenterX - (layout.diceWidth / 2f) + (layout.dieSize / 2f)
+                    side - (layout.diceWidth / 2f) + (layout.dieSize / 2f)
 
                 diceValues.forEachIndexed { index, value ->
                     drawDie(

@@ -2,6 +2,8 @@ package alex.se.gamaw.tavli
 
 //TODO mazema
 //TODO skip turn if no legalMoves!
+//Todo print moves and board for safety
+
 
 //TODO Select Game Mode menu
 //TODO Select Connection Mode menu
