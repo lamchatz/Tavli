@@ -28,8 +28,20 @@ class MainActivity : ComponentActivity() {
             TavliTheme {
                 val navHost = rememberNavController()
                 val vm: BoardViewModel = viewModel()
+                val player1 = Player("White", Color.White)
+                vm.setConnection(
+                    LocalConnection(
+                        listOf(
+                            player1,
+                            Player("Black", Color.Black)
+                        )
+                    ),
+                    player1
+                )
 
-                NavHost(navHost, "connectionMenu") {
+                vm.setGameMode(PortesMode())
+
+                NavHost(navHost, "board") {
                     composable("connectionMenu") {
                         ConnectionMenu(
                             selectOnline = {

@@ -6,6 +6,8 @@ import androidx.compose.ui.graphics.Color
 
 interface GameMode {
     fun initialBoard(): List<Piece>
+
+    fun isLegalMove(target: Int, boardState: Map<Int, List<Piece>>, color: Color): Boolean
     fun getLegalMoves(boardState: Map<Int, List<Piece>>, selectedPiece: Piece, movePool: List<Int>): Set<Int>
     fun hasLegalMove(boardState: Map<Int, List<Piece>>, color: Color, movePool: List<Int>): Boolean
 

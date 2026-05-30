@@ -1,5 +1,6 @@
 package alex.se.gamaw.tavli.data
 
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -19,13 +20,19 @@ data class Board(
     val leftSideCenterX: Float,
     val diceWidth: Float,
     val dieSize: Float,
-    val dieSpacing: Dp
+    val dieSpacing: Dp,
+    val offWidth: Float,
+    val whiteOffRect: Rect,
+    val blackOffRect: Rect
 )
 
 
 fun calculateBoardLayout(width: Float, height: Float): Board {
-    val barWidth = width * 0.05f
-    val sideWidth = (width - barWidth) / 2f
+    val offWidth = width * 0.08f
+    val playableWidth = width - offWidth
+
+    val barWidth = playableWidth * 0.05f
+    val sideWidth = (playableWidth - barWidth) / 2f
     val pointWidth = sideWidth / 6f
     val pointHeight = height * 0.35f
     val pieceRadius = pointWidth * 0.4f
@@ -59,6 +66,10 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
         )
     }
 
+    // White bears off at the top right, Black at the bottom right
+    val whiteOffRect = Rect(left = playableWidth, top = 0f, right = width, bottom = height * 0.4f)
+    val blackOffRect = Rect(left = playableWidth, top = height * 0.6f, right = width, bottom = height)
+
     val barCenterX = sideWidth + (barWidth / 2f)
     val barWhiteY = height * 0.25f
     val barBlackY = height * 0.75f
@@ -66,7 +77,6 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
     val leftSideCenterX = sideWidth / 2f
     val dieSize = pointWidth * 1.2f
     val dieSpacing = 8.dp
-
     val diceWidth = 2 * dieSize + dieSpacing.value
 
     return Board(
@@ -84,7 +94,10 @@ fun calculateBoardLayout(width: Float, height: Float): Board {
         leftSideCenterX,
         diceWidth,
         dieSize,
-        dieSpacing
+        dieSpacing,
+        offWidth,
+        whiteOffRect,
+        blackOffRect
     )
 }
 

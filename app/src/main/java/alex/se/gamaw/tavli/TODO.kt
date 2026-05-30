@@ -1,9 +1,9 @@
 package alex.se.gamaw.tavli
 
 //TODO mazema
+// track how many pieces each player has collected
 //TODO skip turn if no legalMoves!
 //Todo print moves and board for safety
-
 
 //TODO Select Game Mode menu
 //TODO Select Connection Mode menu

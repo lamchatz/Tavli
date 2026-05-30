@@ -1,10 +1,13 @@
 package alex.se.gamaw.tavli.gamemode
 
-import alex.se.gamaw.tavli.data.BarIndex
-import alex.se.gamaw.tavli.data.Die
+import alex.se.gamaw.tavli.data.enums.BarIndex
+import alex.se.gamaw.tavli.data.enums.CollectionIndex
 import alex.se.gamaw.tavli.data.Piece
+import alex.se.gamaw.tavli.data.enums.Direction
+import alex.se.gamaw.tavli.data.enums.TOTAL_PIECES
 import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
+
 
 class PortesMode() : GameMode {
     override fun initialBoard(): List<Piece> {
@@ -50,7 +53,7 @@ class PortesMode() : GameMode {
         movePool: List<Int>
     ): Set<Int> {
         val myColor = selectedPiece.color
-        val barIndex = if (myColor == Color.White) BarIndex.WHITE.value else BarIndex.BLACK.value
+        val barIndex = BarIndex.get(myColor)
 
         val position = selectedPiece.position
         if (boardState[barIndex].orEmpty().isNotEmpty() && position != barIndex) {
@@ -62,21 +65,21 @@ class PortesMode() : GameMode {
                 movePool.map { BarIndex.WHITE.value - it }
             }
 
+            myColor == Color.White -> {
+                movePool.map { calculateTarget(position, it, true)}
+            }
+
             position == BarIndex.BLACK.value -> {
                 movePool.map { BarIndex.BLACK.value + it }
             }
 
-            myColor == Color.White -> {
-                movePool.map { position - it }
-            }
-
             else -> {
-                movePool.map { position + it }
+                movePool.map { calculateTarget(position, it, false) }
             }
         }
 
-        val singleMoves = possibleRange.filterTo(mutableSetOf()) { targetIndex ->
-            isLegalMove(boardState[targetIndex].orEmpty(), myColor)
+        val singleMoves = possibleRange.distinct().filterTo(mutableSetOf()) { targetIndex ->
+            isLegalMove(targetIndex, boardState, myColor)
         }
 
         return singleMoves + getCombinationMoves(movePool, myColor, position, boardState)
@@ -90,7 +93,7 @@ class PortesMode() : GameMode {
     ): Set<Int> {
         if (movePool.size < 2) return emptySet()
 
-        val direction = if (myColor == Color.White) -1 else 1
+        val isWhite = myColor == Color.White
         val combinedMoves = mutableSetOf<Int>()
 
         fun explore(currentPos: Int, remainingDice: List<Int>, stepsTaken: Int) {
@@ -103,10 +106,11 @@ class PortesMode() : GameMode {
             // Using distinct() ensures we don't recalculate identical dice (doubles)
             val uniqueDice = remainingDice.distinct()
             for (die in uniqueDice) {
-                val nextPos = currentPos + (die * direction)
+//                val nextPos = currentPos + (die * direction)
+                val nextPos = calculateTarget(currentPos, die, isWhite)
 
                 // If the landing spot is legal, continue moving down this path
-                if (isLegalMove(boardState[nextPos].orEmpty(), myColor)) {
+                if (isLegalMove(nextPos, boardState, myColor)) {
                     val nextRemaining = remainingDice.toMutableList().apply { remove(die) }
                     explore(nextPos, nextRemaining, stepsTaken + 1)
                 }
@@ -118,23 +122,39 @@ class PortesMode() : GameMode {
     }
 
     // A move is legal if:
+    // - Target is in bounds
+    // - Target is the collection point and can collect
     // - The square is empty
     // - OR it's your own color
     // - OR it's an opponent's only 1 piece
-    private fun isLegalMove(
-        stackAtTarget: List<Piece>,
-        myColor: Color
-    ): Boolean = stackAtTarget.isEmpty() ||
-            stackAtTarget.last().color == myColor ||
-            stackAtTarget.size == 1
+    override fun isLegalMove(
+        target: Int,
+        boardState: Map<Int, List<Piece>>,
+        color: Color
+    ): Boolean {
+        if (!inBounds(target)) return false
 
+        if (target == CollectionIndex.get(color)) {
+            return canCollect(boardState, color)
+        }
+
+        val stackAtTarget = boardState[target].orEmpty()
+
+        return stackAtTarget.isEmpty() ||
+                color == stackAtTarget.last().color ||
+                stackAtTarget.size == 1
+    }
+
+    private fun inBounds(target: Int): Boolean =
+        target in 0..23 || (target == CollectionIndex.WHITE.value || target == CollectionIndex.BLACK.value)
 
     override fun hasLegalMove(
         boardState: Map<Int, List<Piece>>,
         color: Color,
         movePool: List<Int>
     ): Boolean {
-        val barIndex = if (color == Color.White) BarIndex.WHITE.value else BarIndex.BLACK.value
+        val isWhite = color == Color.White
+        val barIndex = BarIndex.get(color)
         val piecesOnBar = boardState[barIndex].orEmpty()
 
         val startingPositions = if (piecesOnBar.isNotEmpty()) {
@@ -145,16 +165,12 @@ class PortesMode() : GameMode {
             }.keys
         }
 
-        val direction = if (color == Color.White) -1 else 1
-
         for (pos in startingPositions) {
             for (move in movePool) {
-                val targetIndex = pos + (direction * move)
-
-                if (targetIndex in 0..23) {
-                    if (isLegalMove(boardState[targetIndex].orEmpty(), color)) {
-                        return true
-                    }
+//                val targetIndex = pos + (direction * move)
+                val targetIndex = calculateTarget(pos, move, isWhite)
+                if (isLegalMove(targetIndex, boardState, color)) {
+                    return true
                 }
             }
         }
@@ -177,13 +193,14 @@ class PortesMode() : GameMode {
         val color = fromList.last().color
         var chosenIntermediate = to
 
-        val direction = if (color == Color.White) -1 else 1
+        val isWhite = color == Color.White
 
         if (movesLeft == 2) {
             if (abs(to - from) == movePool.sumOf { it }) {
                 // check if an opponent's piece can be hit
                 for (move in movePool) {
-                    val s = from + (move * direction)
+//                    val s = from + (move * direction)
+                    val s = calculateTarget(from, move, isWhite)
                     if (hitsOpponent(boardState[s].orEmpty(), color)) {
                         chosenIntermediate = s
                         break
@@ -200,7 +217,8 @@ class PortesMode() : GameMode {
             val steps = mutableSetOf<Int>()
             var step = from
             for (move in movePool) {
-                step += (move * direction)
+//                step += (move * direction)
+                step = calculateTarget(step, move, isWhite)
                 if (step > to) break
                 if (hitsOpponent(boardState[step].orEmpty(), color)) {
                     steps.add(step)
@@ -236,7 +254,7 @@ class PortesMode() : GameMode {
         val toList = boardState[to].orEmpty()
         val pieceToMove = fromList.last().copy(position = to)
 
-        if (!isLegalMove(boardState[from].orEmpty(), pieceToMove.color)) return boardState
+        if (!isLegalMove(to, boardState, pieceToMove.color)) return boardState
 
         if (toList.isEmpty()) {
             return boardState + mapOf(
@@ -246,8 +264,7 @@ class PortesMode() : GameMode {
         }
 
         val pieceToLand = toList.last()
-        val barIndex =
-            if (Color.White == pieceToMove.color) BarIndex.BLACK.value else BarIndex.WHITE.value
+        val barIndex = BarIndex.get(pieceToLand.color)
 
         if (pieceToLand.color != pieceToMove.color) {
             return boardState + mapOf(
@@ -268,5 +285,36 @@ class PortesMode() : GameMode {
             return color != positionToGo.last().color
         }
         return false
+    }
+
+    private fun canCollect(piecesByPosition: Map<Int, List<Piece>>, color: Color): Boolean {
+        val isWhite = Color.White == color
+        val range = if (isWhite) 0..5 else 18..23
+        val collectionIndex = CollectionIndex.get(color)
+        var sum = 0
+        for (i in range) {
+            sum += piecesByPosition[i].orEmpty().count { piece -> piece.color == color }
+        }
+
+        return sum + piecesByPosition[collectionIndex].orEmpty().size == TOTAL_PIECES
+    }
+
+    private fun calculateTarget(start: Int, plus: Int, isWhite: Boolean): Int {
+        val direction = Direction.get(isWhite)
+        val target = start + (direction * plus)
+
+        return if (isWhite) {
+            if (target < 0) {
+                CollectionIndex.WHITE.value
+            } else {
+                target
+            }
+        } else {
+            if (target > 23) {
+                CollectionIndex.BLACK.value
+            } else {
+                target
+            }
+        }
     }
 }

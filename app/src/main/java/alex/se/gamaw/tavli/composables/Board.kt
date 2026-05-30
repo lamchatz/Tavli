@@ -1,10 +1,16 @@
 package alex.se.gamaw.tavli.composables
 
-import alex.se.gamaw.tavli.data.BarIndex
+import alex.se.gamaw.tavli.data.enums.BarIndex
 import alex.se.gamaw.tavli.data.Board
+import alex.se.gamaw.tavli.data.enums.CollectionIndex
 import alex.se.gamaw.tavli.data.GameState
 import alex.se.gamaw.tavli.data.Piece
+import alex.se.gamaw.tavli.data.enums.barColor
+import alex.se.gamaw.tavli.data.enums.boardBrush
 import alex.se.gamaw.tavli.data.calculateBoardLayout
+import alex.se.gamaw.tavli.data.enums.darkTriangle
+import alex.se.gamaw.tavli.data.enums.lightTriangle
+import alex.se.gamaw.tavli.data.enums.offTrayColor
 import alex.se.gamaw.tavli.viewmodel.BoardViewModel
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,15 +42,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-val boardBrush = Brush.verticalGradient(
-    0.0f to Color(0xFF5D3A1A),
-    0.5f to Color(0xFF8B5A2B),
-    1.0f to Color(0xFF5D3A1A)
-)
 
-val lightTriangle = Color(0xFFD9A066)
-val darkTriangle = Color(0xFF5C2E1A)
-val barColor = Color(0xFF4E2A17)
 
 @Composable
 fun GameScreen(boardViewModel: BoardViewModel) {
@@ -200,6 +198,70 @@ fun Board(
                 }
             }
 
+            // 5. Draw Bearing Off Trays (-2 and 25)
+            drawRect(
+                color = offTrayColor,
+                topLeft = layout.whiteOffRect.topLeft,
+                size = layout.whiteOffRect.size
+            )
+            drawRect(
+                color = offTrayColor,
+                topLeft = layout.blackOffRect.topLeft,
+                size = layout.blackOffRect.size
+            )
+
+// --- Highlights for Allowed or Selected Off-moves ---
+            val offIndices = listOf(CollectionIndex.WHITE.value to layout.whiteOffRect, CollectionIndex.BLACK.value to layout.blackOffRect)
+            offIndices.forEach { (idx, rect) ->
+                if (gameState.allowedMoves.contains(idx)) {
+                    drawRect(
+                        color = Color.Yellow.copy(alpha = 0.3f),
+                        topLeft = rect.topLeft,
+                        size = rect.size,
+                        style = Fill
+                    )
+                    drawRect(
+                        color = Color.Yellow,
+                        topLeft = rect.topLeft,
+                        size = rect.size,
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+                if (gameState.selectedPoint == idx) {
+                    drawRect(
+                        color = Color.Magenta.copy(alpha = 0.3f),
+                        topLeft = rect.topLeft,
+                        size = rect.size,
+                        style = Fill
+                    )
+                    drawRect(
+                        color = Color.Magenta,
+                        topLeft = rect.topLeft,
+                        size = rect.size,
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+            }
+
+            // --- Draw Borne-off Pieces inside Trays ---
+            // White pieces stacked horizontally or vertically inside the tray
+            val whiteOffPieces = gameState.piecesByPosition[CollectionIndex.WHITE.value] ?: emptyList()
+            whiteOffPieces.forEachIndexed { index, piece ->
+                // Tailor layout calculation if you prefer slim rectangular slabs instead of overlapping circles
+                val x = layout.whiteOffRect.left + (layout.offWidth / 2)
+                val y =
+                    layout.whiteOffRect.top + layout.pieceRadius + (index * (layout.pieceRadius * 0.5f)) // tightly stacked
+                drawCircle(color = piece.color, radius = layout.pieceRadius, center = Offset(x, y))
+            }
+
+            val blackOffPieces = gameState.piecesByPosition[CollectionIndex.BLACK.value] ?: emptyList()
+            blackOffPieces.forEachIndexed { index, piece ->
+                val x = layout.blackOffRect.left + (layout.offWidth / 2)
+                val y =
+                    layout.blackOffRect.bottom - layout.pieceRadius - (index * (layout.pieceRadius * 0.5f))
+                drawCircle(color = piece.color, radius = layout.pieceRadius, center = Offset(x, y))
+            }
+
             val diceValues = gameState.dice
             if (diceValues.isNotEmpty()) {
                 val side =
@@ -229,6 +291,15 @@ fun findClickedIndex(
     piecesByPosition: Map<Int, List<Piece>>
 ): Int? {
 
+    // 1. Check if bearing-off trays were clicked first
+    if (layout.whiteOffRect.contains(offset)) {
+        return CollectionIndex.WHITE.value
+    }
+    if (layout.blackOffRect.contains(offset)) {
+        return CollectionIndex.BLACK.value
+    }
+
+    // 2. Check individual pieces on the white bar
     val whiteBarPieces = piecesByPosition[BarIndex.WHITE.value] ?: emptyList()
     whiteBarPieces.forEachIndexed { index, _ ->
         val pieceCenter = Offset(
@@ -238,6 +309,7 @@ fun findClickedIndex(
         if ((offset - pieceCenter).getDistance() <= layout.pieceRadius) return BarIndex.WHITE.value
     }
 
+    // 3. Check individual pieces on the black bar
     val blackBarPieces = piecesByPosition[BarIndex.BLACK.value] ?: emptyList()
     blackBarPieces.forEachIndexed { index, _ ->
         val pieceCenter = Offset(
@@ -247,8 +319,9 @@ fun findClickedIndex(
         if ((offset - pieceCenter).getDistance() <= layout.pieceRadius) return BarIndex.BLACK.value
     }
 
+    // 4. Check individual stacked pieces on active points
     piecesByPosition.forEach { (index, stack) ->
-        if (index == BarIndex.WHITE.value || index == BarIndex.BLACK.value) return@forEach
+        if (index == BarIndex.WHITE.value || index == BarIndex.BLACK.value || index == CollectionIndex.WHITE.value || index == CollectionIndex.BLACK.value) return@forEach
 
         val point = layout.pointLayouts[index] ?: return@forEach
         stack.forEachIndexed { stackIndex, _ ->
@@ -263,16 +336,17 @@ fun findClickedIndex(
         }
     }
 
-
+    // 5. Fallback: Check if an empty triangle zone area was clicked
     val x = offset.x
     val y = offset.y
     val pointHeight = size.height * 0.35f
     val isTopZone = y < pointHeight
     val isBottomZone = y > (size.height - pointHeight)
 
-    val barWidth = size.width * 0.05f
-    val sideWidth = (size.width - barWidth) / 2f
-    val pointWidth = sideWidth / 6f
+    // CRITICAL FIX: Base calculations on layout constraints, matching calculateBoardLayout
+    val sideWidth = layout.sideWidth
+    val barWidth = layout.barWidth
+    val pointWidth = layout.pointWidth
 
     return when {
         !isTopZone && !isBottomZone -> null
@@ -282,7 +356,8 @@ fun findClickedIndex(
             if (isTopZone) 6 + reversed else 17 - reversed
         }
 
-        x > sideWidth + barWidth -> {
+        // Ensuring we bound-check within the middle-right play zone, before hitting the trays
+        x > (sideWidth + barWidth) && x < (sideWidth * 2 + barWidth) -> {
             val column = ((x - sideWidth - barWidth) / pointWidth).toInt().coerceIn(0, 5)
             val reversed = 5 - column
             if (isTopZone) reversed else 23 - reversed
