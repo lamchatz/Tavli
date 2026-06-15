@@ -15,10 +15,10 @@ class LocalConnection(private val players: List<Player>) : Connection {
     override val turnUpdates = _turnUpdates.asSharedFlow()
 
     override suspend fun sendTurnData(turnData: TurnData) {
-//        val diceVal1 = random.nextInt(6) + 1
-//        val diceVal2 = random.nextInt(6) + 1
-        val diceVal1 = 3
-        val diceVal2 = 4
+        val diceVal1 = random.nextInt(6) + 1
+        val diceVal2 = random.nextInt(6) + 1
+//        val diceVal1 = 3
+//        val diceVal2 = 4
         val dice = listOf(Die(diceVal1), Die(diceVal2))
 
         // Calculate pool

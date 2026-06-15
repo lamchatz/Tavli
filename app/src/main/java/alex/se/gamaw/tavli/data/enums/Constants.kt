@@ -3,8 +3,9 @@ package alex.se.gamaw.tavli.data.enums
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-const val TOTAL_PIECES = 2
+const val TOTAL_PIECES = 15
 
+val HOME_BASES = mapOf( Color.White to (5 downTo 0), Color.Black to 18..23)
 val boardBrush = Brush.verticalGradient(
     0.0f to Color(0xFF5D3A1A),
     0.5f to Color(0xFF8B5A2B),

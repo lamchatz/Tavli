@@ -5,15 +5,15 @@ import alex.se.gamaw.tavli.data.MoveResult
 import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.enums.BarIndex
 import alex.se.gamaw.tavli.data.enums.CollectionIndex
-import alex.se.gamaw.tavli.data.enums.Direction
-import alex.se.gamaw.tavli.data.enums.TOTAL_PIECES
+import alex.se.gamaw.tavli.gamemode.Calculator.Companion.calculateTarget
+import alex.se.gamaw.tavli.gamemode.Calculator.Companion.inBounds
+import alex.se.gamaw.tavli.gamemode.CollectionHelper.Companion.WRONG_LIST
 import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 
-
 class PortesMode() : GameMode {
-    override fun initialBoard(): List<Piece> {
-        return listOf(
+    companion object {
+        val INITIAL_BOARD = listOf(
             Piece(0, 5, Color.White),
             Piece(1, 5, Color.White),
             Piece(2, 5, Color.White),
@@ -49,6 +49,10 @@ class PortesMode() : GameMode {
         )
     }
 
+    override fun initialBoard(): List<Piece> {
+        return INITIAL_BOARD
+    }
+
     override fun getLegalMoves(
         boardState: Map<Int, List<Piece>>,
         selectedPiece: Piece,
@@ -81,7 +85,7 @@ class PortesMode() : GameMode {
         }
 
         val singleMoves = possibleRange.distinct().filterTo(mutableSetOf()) { targetIndex ->
-            isLegalMove(boardState, targetIndex, myColor)
+            isLegalMove(boardState, position, targetIndex, myColor, movePool)
         }
 
         return singleMoves + getCombinationMoves(
@@ -110,25 +114,29 @@ class PortesMode() : GameMode {
 
         when (movesLeft) {
             2 -> {
-                var target = calculateTarget(from, movePool[0], isWhite)
-                var destination = calculateTarget(target, movePool[1], isWhite)
+                var nextPosition = calculateTarget(from, movePool[0], isWhite)
+                var destination = calculateTarget(nextPosition, movePool[1], isWhite)
 
-                if (allowedMoves.contains(target) && isLegalMove(
+                if (allowedMoves.contains(nextPosition) && isLegalMove(
                         boardState,
-                        calculateTarget(target, movePool[1], isWhite),
-                        myColor
+                        nextPosition,
+                        destination,
+                        myColor,
+                        movePool
                     )
                 ) {
                     combinedMoves.add(destination)
                 }
 
-                target = calculateTarget(from, movePool[1], isWhite)
-                destination = calculateTarget(target, movePool[0], isWhite)
+                nextPosition = calculateTarget(from, movePool[1], isWhite)
+                destination = calculateTarget(nextPosition, movePool[0], isWhite)
 
-                if (allowedMoves.contains(target) && isLegalMove(
+                if (allowedMoves.contains(nextPosition) && isLegalMove(
                         boardState,
+                        nextPosition,
                         destination,
-                        myColor
+                        myColor,
+                        movePool
                     )
                 ) {
                     combinedMoves.add(destination)
@@ -137,9 +145,10 @@ class PortesMode() : GameMode {
 
             3, 4 -> {
                 var start = from
+                var i = 0
                 for (move in movePool) {
                     val target = calculateTarget(start, move, isWhite)
-                    if (isLegalMove(boardState, target, myColor)) {
+                    if (isLegalMove(boardState, start, target, myColor, movePool.drop(i++))) {
                         combinedMoves.add(target)
                     } else {
                         return combinedMoves
@@ -154,21 +163,23 @@ class PortesMode() : GameMode {
     }
 
     // A move is legal if:
-    // - Target is in bounds
     // - Target is the collection point and can collect
+    // - Target is in bounds
     // - The square is empty
     // - OR it's your own color
     // - OR it's an opponent's only 1 piece
     override fun isLegalMove(
         boardState: Map<Int, List<Piece>>,
+        from: Int,
         target: Int,
-        color: Color
+        color: Color,
+        movePool: List<Int>
     ): Boolean {
-        if (!inBounds(target)) return false
-
         if (target == CollectionIndex.get(color)) {
-            return canCollect(boardState, color)
+            return CollectionHelper.canCollect(boardState, movePool, from, color)
         }
+
+        if (!inBounds(target)) return false
 
         val stackAtTarget = boardState[target].orEmpty()
 
@@ -177,8 +188,6 @@ class PortesMode() : GameMode {
                 stackAtTarget.size == 1
     }
 
-    private fun inBounds(target: Int): Boolean =
-        target in 0..23 || (target == CollectionIndex.WHITE.value || target == CollectionIndex.BLACK.value)
 
     override fun hasLegalMove(
         boardState: Map<Int, List<Piece>>,
@@ -198,10 +207,11 @@ class PortesMode() : GameMode {
         }
 
         for (pos in startingPositions) {
+            var i = 0
             for (move in movePool) {
 //                val targetIndex = pos + (direction * move)
                 val targetIndex = calculateTarget(pos, move, isWhite)
-                if (isLegalMove(boardState, targetIndex, color)) {
+                if (isLegalMove(boardState, pos, targetIndex, color, movePool.drop(i++))) {
                     return true
                 }
             }
@@ -286,7 +296,7 @@ class PortesMode() : GameMode {
 
         val color = fromList.last().color
 
-        if (!isLegalMove(boardState, to, color)) {
+        if (!isLegalMove(boardState, from, to, color, movePool)) {
             return MoveResult.noMove(move)
         }
 
@@ -297,20 +307,22 @@ class PortesMode() : GameMode {
             boardState + mapOf(from to newFromList)
         }
 
+        val pieceToMove = fromList.last().copy(position = to)
+
         if (CollectionIndex.isCollectionPoint(to)) {
-            //handle here
+            val newMovePool = CollectionHelper.resolveMove(boardState, movePool, from)
+            if (WRONG_LIST == newMovePool) {
+                return MoveResult.noMove(boardState)
+            }
 
-            return MoveResult.noMove(boardState)
-        }
-
-        if (BarIndex.isBarIndexPoint(to)) {
-            //handle here
-
-            return MoveResult.noMove(boardState)
+            return MoveResult(
+                newBoardState + mapOf(
+                    to to boardState[to].orEmpty() + pieceToMove
+                ), newMovePool
+            )
         }
 
         val move = abs(to - from)
-        val pieceToMove = fromList.last().copy(position = to)
 
         val toList = boardState[to].orEmpty()
         if (toList.isEmpty() || toList.last().color == color) {
@@ -328,42 +340,10 @@ class PortesMode() : GameMode {
         )
     }
 
-
     private fun hitsOpponent(positionToGo: List<Piece>, color: Color): Boolean {
         if (positionToGo.isNotEmpty() && positionToGo.size == 1) {
             return color != positionToGo.last().color
         }
         return false
-    }
-
-    private fun canCollect(piecesByPosition: Map<Int, List<Piece>>, color: Color): Boolean {
-        val isWhite = Color.White == color
-        val range = if (isWhite) 0..5 else 18..23
-        val collectionIndex = CollectionIndex.get(color)
-        var sum = 0
-        for (i in range) {
-            sum += piecesByPosition[i].orEmpty().count { piece -> piece.color == color }
-        }
-
-        return sum + piecesByPosition[collectionIndex].orEmpty().size == TOTAL_PIECES
-    }
-
-    private fun calculateTarget(start: Int, plus: Int, isWhite: Boolean): Int {
-        val direction = Direction.get(isWhite)
-        val target = start + (direction * plus)
-
-        return if (isWhite) {
-            if (target < 0) {
-                CollectionIndex.WHITE.value
-            } else {
-                target
-            }
-        } else {
-            if (target > 23) {
-                CollectionIndex.BLACK.value
-            } else {
-                target
-            }
-        }
     }
 }
