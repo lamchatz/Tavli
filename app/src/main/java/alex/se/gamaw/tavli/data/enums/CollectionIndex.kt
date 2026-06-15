@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 
 enum class CollectionIndex(val value: Int) {
-    WHITE(-1), BLACK(24);
+    WHITE(-2), BLACK(25);
 
     companion object {
         fun get(color: Color): Int {

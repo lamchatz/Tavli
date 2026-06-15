@@ -1,8 +1,10 @@
 package alex.se.gamaw.tavli.gamemode
 
+import alex.se.gamaw.tavli.data.Move
+import alex.se.gamaw.tavli.data.MoveResult
+import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.enums.BarIndex
 import alex.se.gamaw.tavli.data.enums.CollectionIndex
-import alex.se.gamaw.tavli.data.Piece
 import alex.se.gamaw.tavli.data.enums.Direction
 import alex.se.gamaw.tavli.data.enums.TOTAL_PIECES
 import androidx.compose.ui.graphics.Color
@@ -66,7 +68,7 @@ class PortesMode() : GameMode {
             }
 
             myColor == Color.White -> {
-                movePool.map { calculateTarget(position, it, true)}
+                movePool.map { calculateTarget(position, it, true) }
             }
 
             position == BarIndex.BLACK.value -> {
@@ -79,45 +81,75 @@ class PortesMode() : GameMode {
         }
 
         val singleMoves = possibleRange.distinct().filterTo(mutableSetOf()) { targetIndex ->
-            isLegalMove(targetIndex, boardState, myColor)
+            isLegalMove(boardState, targetIndex, myColor)
         }
 
-        return singleMoves + getCombinationMoves(movePool, myColor, position, boardState)
+        return singleMoves + getCombinationMoves(
+            boardState,
+            position,
+            myColor,
+            movePool,
+            singleMoves
+        )
     }
 
     private fun getCombinationMoves(
-        movePool: List<Int>,
-        myColor: Color,
-        position: Int,
         boardState: Map<Int, List<Piece>>,
+        from: Int,
+        myColor: Color,
+        movePool: List<Int>,
+        allowedMoves: Set<Int>,
     ): Set<Int> {
-        if (movePool.size < 2) return emptySet()
+        val movesLeft = movePool.size
+        if (movesLeft < 2) return emptySet()
+
+        if (boardState[BarIndex.get(myColor)].orEmpty().size > 1) return emptySet()
 
         val isWhite = myColor == Color.White
         val combinedMoves = mutableSetOf<Int>()
 
-        fun explore(currentPos: Int, remainingDice: List<Int>, stepsTaken: Int) {
-            // If we've moved 2 or more steps combined, the final landing spot is valid
-            if (stepsTaken >= 2) {
-                combinedMoves.add(currentPos)
+        when (movesLeft) {
+            2 -> {
+                var target = calculateTarget(from, movePool[0], isWhite)
+                var destination = calculateTarget(target, movePool[1], isWhite)
+
+                if (allowedMoves.contains(target) && isLegalMove(
+                        boardState,
+                        calculateTarget(target, movePool[1], isWhite),
+                        myColor
+                    )
+                ) {
+                    combinedMoves.add(destination)
+                }
+
+                target = calculateTarget(from, movePool[1], isWhite)
+                destination = calculateTarget(target, movePool[0], isWhite)
+
+                if (allowedMoves.contains(target) && isLegalMove(
+                        boardState,
+                        destination,
+                        myColor
+                    )
+                ) {
+                    combinedMoves.add(destination)
+                }
             }
 
-            // Try using each available move as the next step
-            // Using distinct() ensures we don't recalculate identical dice (doubles)
-            val uniqueDice = remainingDice.distinct()
-            for (die in uniqueDice) {
-//                val nextPos = currentPos + (die * direction)
-                val nextPos = calculateTarget(currentPos, die, isWhite)
+            3, 4 -> {
+                var start = from
+                for (move in movePool) {
+                    val target = calculateTarget(start, move, isWhite)
+                    if (isLegalMove(boardState, target, myColor)) {
+                        combinedMoves.add(target)
+                    } else {
+                        return combinedMoves
+                    }
 
-                // If the landing spot is legal, continue moving down this path
-                if (isLegalMove(nextPos, boardState, myColor)) {
-                    val nextRemaining = remainingDice.toMutableList().apply { remove(die) }
-                    explore(nextPos, nextRemaining, stepsTaken + 1)
+                    start = target
                 }
             }
         }
 
-        explore(position, movePool, 0)
         return combinedMoves
     }
 
@@ -128,8 +160,8 @@ class PortesMode() : GameMode {
     // - OR it's your own color
     // - OR it's an opponent's only 1 piece
     override fun isLegalMove(
-        target: Int,
         boardState: Map<Int, List<Piece>>,
+        target: Int,
         color: Color
     ): Boolean {
         if (!inBounds(target)) return false
@@ -169,7 +201,7 @@ class PortesMode() : GameMode {
             for (move in movePool) {
 //                val targetIndex = pos + (direction * move)
                 val targetIndex = calculateTarget(pos, move, isWhite)
-                if (isLegalMove(targetIndex, boardState, color)) {
+                if (isLegalMove(boardState, targetIndex, color)) {
                     return true
                 }
             }
@@ -179,106 +211,123 @@ class PortesMode() : GameMode {
     }
 
     override fun resolveMove(
-        boardState: Map<Int, List<Piece>>,
-        from: Int,
-        to: Int,
-        movePool: List<Int>,
-    ): Map<Int, List<Piece>> {
+        move: Move
+    ): MoveResult {
+        var (boardState, from, to, movePool) = move
+
         val movesLeft = movePool.size
-        if (movesLeft == 0) return boardState
+        if (movesLeft == 0) return MoveResult.noMove(move)
 
         val fromList = boardState[from].orEmpty()
-        if (fromList.isEmpty()) return boardState
+        if (fromList.isEmpty()) return MoveResult.noMove(move)
+
+        if (CollectionIndex.isCollectionPoint(to)) {
+            //doSomething else
+
+            return resolveSingleMove(move)
+        }
+
+        if (movesLeft == 1) {
+            return resolveSingleMove(move)
+        }
 
         val color = fromList.last().color
-        var chosenIntermediate = to
-
         val isWhite = color == Color.White
+        val moveValue = abs(to - from)
 
-        if (movesLeft == 2) {
-            if (abs(to - from) == movePool.sumOf { it }) {
-                // check if an opponent's piece can be hit
-                for (move in movePool) {
-//                    val s = from + (move * direction)
-                    val s = calculateTarget(from, move, isWhite)
+        if (movePool.any { it == moveValue }) {
+            return resolveSingleMove(move)
+        }
+
+        var intermediateMove = MoveResult(boardState, movePool)
+
+        if (movePool.distinct().size <= 1) {
+            do {
+                val s = calculateTarget(
+                    from,
+                    movePool.drop(1).first(),
+                    isWhite
+                )
+                intermediateMove = resolveSingleMove(Move(intermediateMove, from, s))
+                from = s
+            } while (s != to && movePool.isNotEmpty())
+
+            return intermediateMove
+        } else {
+            if (moveValue == movePool.sum()) {
+                for (step in movePool) {
+                    val s = calculateTarget(from, step, isWhite)
                     if (hitsOpponent(boardState[s].orEmpty(), color)) {
-                        chosenIntermediate = s
-                        break
+                        intermediateMove = resolveSingleMove(Move(intermediateMove, from, s))
+
+                        val moveLeft = calculateTarget(s, movePool.single { it != step }, isWhite)
+                        return resolveSingleMove(Move(intermediateMove, s, moveLeft))
                     }
                 }
 
-                if (chosenIntermediate != to) {
-                    val intermediateState = resolveSingleMove(boardState, from, chosenIntermediate)
-                    return resolveSingleMove(intermediateState, chosenIntermediate, to)
-                }
-                // if not found, just go to the original selected position, no worries
-            }
-        } else if (movesLeft > 2) {
-            val steps = mutableSetOf<Int>()
-            var step = from
-            for (move in movePool) {
-//                step += (move * direction)
-                step = calculateTarget(step, move, isWhite)
-                if (step > to) break
-                if (hitsOpponent(boardState[step].orEmpty(), color)) {
-                    steps.add(step)
-                }
+                return resolveSingleMove(move).copy(moves = emptyList())
             }
 
-            if (steps.isEmpty()) {
-                return resolveSingleMove(boardState, from, to)
-            }
-
-            var startingPosition = from
-            var intermediateState = boardState
-            for (step in steps) {
-                intermediateState = resolveSingleMove(intermediateState, startingPosition, step)
-                startingPosition = step
-            }
-
-            if (startingPosition == to) {
-                return intermediateState
-            }
-            return resolveSingleMove(intermediateState, steps.last(), to)
+            // possible collection point weirdness
         }
 
-        return resolveSingleMove(boardState, from, to)
+        return MoveResult.noMove(move)
     }
 
-    private fun resolveSingleMove(
-        boardState: Map<Int, List<Piece>>,
-        from: Int,
-        to: Int
-    ): Map<Int, List<Piece>> {
+    fun resolveSingleMove(
+        move: Move
+    ): MoveResult {
+        val (boardState, from, to, movePool) = move
+
         val fromList = boardState[from].orEmpty()
-        val toList = boardState[to].orEmpty()
+        if (fromList.isEmpty()) {
+            return MoveResult.noMove(move)
+        }
+
+        val color = fromList.last().color
+
+        if (!isLegalMove(boardState, to, color)) {
+            return MoveResult.noMove(move)
+        }
+
+        val newFromList = fromList.drop(1)
+        val newBoardState = if (newFromList.isEmpty()) {
+            boardState - from
+        } else {
+            boardState + mapOf(from to newFromList)
+        }
+
+        if (CollectionIndex.isCollectionPoint(to)) {
+            //handle here
+
+            return MoveResult.noMove(boardState)
+        }
+
+        if (BarIndex.isBarIndexPoint(to)) {
+            //handle here
+
+            return MoveResult.noMove(boardState)
+        }
+
+        val move = abs(to - from)
         val pieceToMove = fromList.last().copy(position = to)
 
-        if (!isLegalMove(to, boardState, pieceToMove.color)) return boardState
-
-        if (toList.isEmpty()) {
-            return boardState + mapOf(
-                from to fromList.dropLast(1),
-                to to toList + pieceToMove
-            )
+        val toList = boardState[to].orEmpty()
+        if (toList.isEmpty() || toList.last().color == color) {
+            return MoveResult(newBoardState + (to to toList + pieceToMove), movePool - move)
         }
 
         val pieceToLand = toList.last()
         val barIndex = BarIndex.get(pieceToLand.color)
 
-        if (pieceToLand.color != pieceToMove.color) {
-            return boardState + mapOf(
-                from to fromList.dropLast(1),
+        return MoveResult(
+            newBoardState + mapOf(
                 to to toList.dropLast(1) + pieceToMove,
-                barIndex to boardState[barIndex].orEmpty() + pieceToLand.copy(position = barIndex)
-            )
-        }
-
-        return boardState + mapOf(
-            from to fromList.dropLast(1),
-            to to toList + pieceToMove
+                barIndex to newBoardState[barIndex].orEmpty() + pieceToLand.copy(position = barIndex)
+            ), movePool - move
         )
     }
+
 
     private fun hitsOpponent(positionToGo: List<Piece>, color: Color): Boolean {
         if (positionToGo.isNotEmpty() && positionToGo.size == 1) {

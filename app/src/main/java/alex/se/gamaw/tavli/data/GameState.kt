@@ -1,13 +1,10 @@
 package alex.se.gamaw.tavli.data
 
 import alex.se.gamaw.tavli.data.enums.CollectionIndex
-import alex.se.gamaw.tavli.data.enums.Direction
 import alex.se.gamaw.tavli.data.enums.TOTAL_PIECES
-import androidx.compose.ui.graphics.Color
-import kotlin.math.abs
 
 data class GameState(
-    val piecesByPosition: Map<Int, List<Piece>> = emptyMap(),
+    val boardState: Map<Int, List<Piece>> = emptyMap(),
     val selectedPoint: Int? = null,
     val allowedMoves: Set<Int> = emptySet(),
     val currentPlayer: Player? = null,
@@ -20,60 +17,37 @@ data class GameState(
         return dice[0].value == dice[1].value
     }
 
-    fun calculateStateAfterMove(
-        from: Int,
-        to: Int,
-        piecesByPosition: Map<Int, List<Piece>>
-    ): GameState {
-        val toList = piecesByPosition[to].orEmpty()
-        if (toList.isEmpty()) {
-            return this.copy()
-        }
-
-        val direction = Direction.get(toList.last().color == Color.White)
-        val currentPool = movePool
-        val currentDice = dice
-        val doubleDice = areDiceDouble()
-        val move = abs(to - from)
-        val movesSum = currentPool.sumOf { it }
-
-        var nextPool = currentPool
-        var nextDice = currentDice
-
-
-        if (doubleDice) {
-            val d1 = currentDice[0].value
-            val diceUsed = move / d1
-            nextPool = currentPool.drop(diceUsed)
-
-            nextDice = currentDice.mapIndexed { index, die ->
-                when {
-                    index == 0 && nextPool.size < 3 -> die.copy(played = true)
-                    index == 1 && nextPool.isEmpty() -> die.copy(played = true)
-                    else -> die
+    fun updateGameState(moveResult: MoveResult): GameState {
+        val newMovePool = moveResult.moves
+        val nextDice = if (areDiceDouble()) {
+            when (newMovePool.size) {
+                0 -> dice.map { it.copy(played = true) }
+                1, 2 -> dice.mapIndexed { index, die ->
+                    if (index == 0) die.copy(played = true) else die
                 }
+
+                else -> dice
             }
         } else {
-            if (move == movesSum) {
-                nextDice = currentDice.map { it.copy(played = true) }
-                nextPool = emptyList()
-            } else {
-                val dieIndexToPlay = currentDice.indexOfFirst { it.value == move && !it.played }
+            val remainingPool = newMovePool.toMutableList()
 
-                if (dieIndexToPlay != -1) {
-                    nextDice = currentDice.mapIndexed { index, die ->
-                        if (index == dieIndexToPlay) die.copy(played = true) else die
-                    }
-                    nextPool = currentPool.toMutableList().apply { remove(move) }
+            dice.map { die ->
+                if (die.played) {
+                    die
+                } else if (remainingPool.remove(die.value)) {
+                    die
+                } else {
+                    die.copy(played = true)
                 }
             }
         }
 
+        val newBoardState = moveResult.boardState
         return this.copy(
-            piecesByPosition = piecesByPosition,
-            movePool = nextPool,
+            boardState = newBoardState,
             dice = nextDice,
-            completed = gameComplete()
+            movePool = newMovePool,
+            completed = gameComplete(newBoardState)
         )
     }
 
@@ -85,10 +59,10 @@ data class GameState(
         return movePool.isEmpty()
     }
 
-    fun gameComplete(): Boolean {
+    fun gameComplete(boardState: Map<Int, List<Piece>>): Boolean {
         val color = currentPlayer?.color ?: return false
 
         val collectionIndex = CollectionIndex.get(color)
-        return piecesByPosition[collectionIndex].orEmpty().size == TOTAL_PIECES
+        return boardState[collectionIndex].orEmpty().size == TOTAL_PIECES
     }
 }

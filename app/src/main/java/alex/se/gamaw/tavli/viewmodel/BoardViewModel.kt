@@ -2,7 +2,7 @@ package alex.se.gamaw.tavli.viewmodel
 
 import alex.se.gamaw.tavli.connection.Connection
 import alex.se.gamaw.tavli.data.GameState
-import alex.se.gamaw.tavli.data.Piece
+import alex.se.gamaw.tavli.data.Move
 import alex.se.gamaw.tavli.data.Player
 import alex.se.gamaw.tavli.data.TurnData
 import alex.se.gamaw.tavli.gamemode.GameMode
@@ -25,7 +25,7 @@ class BoardViewModel : ViewModel() {
     fun setGameMode(gameMode: GameMode) {
         this.gameMode = gameMode
         _gameState.update { currentState ->
-            currentState.copy(piecesByPosition = gameMode.initialBoard().groupBy { it.position })
+            currentState.copy(boardState = gameMode.initialBoard().groupBy { it.position })
         }
     }
 
@@ -79,29 +79,32 @@ class BoardViewModel : ViewModel() {
 
         println("We are going from ${_gameState.value.selectedPoint} to $to")
 
+        var updatedSnapshot: GameState? = null
         _gameState.update { currentState ->
-            currentState.calculateStateAfterMove(
-                from,
-                to,
-                piecesByPosition = gameMode.resolveMove(
-                    currentState.piecesByPosition,
-                    from,
-                    to,
-                    currentState.movePool
+            currentState.updateGameState(
+                gameMode.resolveMove(
+                    Move(
+                        currentState.boardState,
+                        from,
+                        to,
+                        currentState.movePool
+                    )
                 )
-            )
+            ).also { updatedSnapshot = it }
         }
 
         cancelMove()
-        if (!hasLegalMove()) {
-            viewModelScope.launch {
-                connection.sendTurnData(turnData())
+        updatedSnapshot?.let { freshState ->
+            if (!hasLegalMove(freshState) || freshState.roundCompleted()) {
+                viewModelScope.launch {
+                    connection.sendTurnData(turnData(freshState))
+                }
             }
         }
     }
 
     private fun generateLegalMoves(clickedPosition: Int?) {
-        val selectedPiece = _gameState.value.piecesByPosition[clickedPosition]?.lastOrNull()
+        val selectedPiece = _gameState.value.boardState[clickedPosition]?.lastOrNull()
         if (selectedPiece != null) {
             if (_gameState.value.isNotMyTurn(selectedPiece)) {
                 return
@@ -112,7 +115,7 @@ class BoardViewModel : ViewModel() {
                 currentState.copy(
                     selectedPoint = clickedPosition,
                     allowedMoves = gameMode.getLegalMoves(
-                        currentState.piecesByPosition,
+                        currentState.boardState,
                         selectedPiece,
                         currentState.movePool
                     )
@@ -121,13 +124,15 @@ class BoardViewModel : ViewModel() {
         }
     }
 
-    fun hasLegalMove(): Boolean {
+    fun hasLegalMove(state: GameState = _gameState.value): Boolean {
         if (!::gameMode.isInitialized) return true
 
+        val activeColor = state.currentPlayer?.color ?: return false
+
         return gameMode.hasLegalMove(
-            _gameState.value.piecesByPosition,
-            _gameState.value.currentPlayer!!.color,
-            _gameState.value.movePool
+            state.boardState,
+            activeColor,
+            state.movePool
         )
     }
 
@@ -145,20 +150,14 @@ class BoardViewModel : ViewModel() {
             }
 
             moveTo(clickedPosition)
-            if (_gameState.value.roundCompleted()) {
-                cancelMove()
-                viewModelScope.launch {
-                    connection.sendTurnData(turnData())
-                }
-            }
         } else {
             cancelMove()
         }
     }
 
-    private fun turnData(): TurnData = TurnData(
-        _gameState.value.dice,
-        _gameState.value.currentPlayer!!,
-        _gameState.value.movePool
+    private fun turnData(state: GameState = _gameState.value): TurnData = TurnData(
+        state.dice,
+        state.currentPlayer!!, //handle Player?
+        state.movePool
     )
 }

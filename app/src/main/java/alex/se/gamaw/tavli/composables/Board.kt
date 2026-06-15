@@ -76,7 +76,7 @@ fun GameScreen(boardViewModel: BoardViewModel) {
                             offset,
                             size = size,
                             layout,
-                            gameState.value.piecesByPosition
+                            gameState.value.boardState
                         )
                     )
                 }
@@ -160,8 +160,8 @@ fun Board(
             )
 
 // 3b. Draw Bar Pieces
-            val whiteBarPieces = gameState.piecesByPosition[BarIndex.WHITE.value] ?: emptyList()
-            val blackBarPieces = gameState.piecesByPosition[BarIndex.BLACK.value] ?: emptyList()
+            val whiteBarPieces = gameState.boardState[BarIndex.WHITE.value] ?: emptyList()
+            val blackBarPieces = gameState.boardState[BarIndex.BLACK.value] ?: emptyList()
 
             whiteBarPieces.forEachIndexed { index, piece ->
                 drawCircle(
@@ -180,7 +180,7 @@ fun Board(
             }
 
             // 4. Draw Pieces (Using the pre-grouped map)
-            gameState.piecesByPosition.forEach { (index, stack) ->
+            gameState.boardState.forEach { (index, stack) ->
                 val point = layout.pointLayouts[index] ?: return@forEach
 
                 stack.forEachIndexed { stackIndex, piece ->
@@ -245,7 +245,7 @@ fun Board(
 
             // --- Draw Borne-off Pieces inside Trays ---
             // White pieces stacked horizontally or vertically inside the tray
-            val whiteOffPieces = gameState.piecesByPosition[CollectionIndex.WHITE.value] ?: emptyList()
+            val whiteOffPieces = gameState.boardState[CollectionIndex.WHITE.value] ?: emptyList()
             whiteOffPieces.forEachIndexed { index, piece ->
                 // Tailor layout calculation if you prefer slim rectangular slabs instead of overlapping circles
                 val x = layout.whiteOffRect.left + (layout.offWidth / 2)
@@ -254,7 +254,7 @@ fun Board(
                 drawCircle(color = piece.color, radius = layout.pieceRadius, center = Offset(x, y))
             }
 
-            val blackOffPieces = gameState.piecesByPosition[CollectionIndex.BLACK.value] ?: emptyList()
+            val blackOffPieces = gameState.boardState[CollectionIndex.BLACK.value] ?: emptyList()
             blackOffPieces.forEachIndexed { index, piece ->
                 val x = layout.blackOffRect.left + (layout.offWidth / 2)
                 val y =

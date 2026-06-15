@@ -1,15 +1,16 @@
 package alex.se.gamaw.tavli.gamemode
 
 import alex.se.gamaw.tavli.data.Die
+import alex.se.gamaw.tavli.data.Move
+import alex.se.gamaw.tavli.data.MoveResult
 import alex.se.gamaw.tavli.data.Piece
 import androidx.compose.ui.graphics.Color
 
 interface GameMode {
     fun initialBoard(): List<Piece>
 
-    fun isLegalMove(target: Int, boardState: Map<Int, List<Piece>>, color: Color): Boolean
+    fun isLegalMove(boardState: Map<Int, List<Piece>>, target: Int, color: Color): Boolean
     fun getLegalMoves(boardState: Map<Int, List<Piece>>, selectedPiece: Piece, movePool: List<Int>): Set<Int>
     fun hasLegalMove(boardState: Map<Int, List<Piece>>, color: Color, movePool: List<Int>): Boolean
-
-    fun resolveMove(boardState: Map<Int, List<Piece>>, from: Int, to: Int, movePool: List<Int>): Map<Int, List<Piece>>
+    fun resolveMove(move: Move): MoveResult
 }
