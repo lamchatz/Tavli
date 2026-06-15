@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class BoardViewModel : ViewModel() {
-    private val _gameState = MutableStateFlow(GameState())
+    private val _gameState = MutableStateFlow(GameState(currentPlayer = Player.Uninitialized))
     val gameState = _gameState.asStateFlow()
 
     private var localPlayerProfile: Player? = null
@@ -127,11 +127,9 @@ class BoardViewModel : ViewModel() {
     fun hasLegalMove(state: GameState = _gameState.value): Boolean {
         if (!::gameMode.isInitialized) return true
 
-        val activeColor = state.currentPlayer?.color ?: return false
-
         return gameMode.hasLegalMove(
             state.boardState,
-            activeColor,
+            state.currentPlayer.color,
             state.movePool
         )
     }
@@ -157,7 +155,7 @@ class BoardViewModel : ViewModel() {
 
     private fun turnData(state: GameState = _gameState.value): TurnData = TurnData(
         state.dice,
-        state.currentPlayer!!, //handle Player?
+        state.currentPlayer,
         state.movePool
     )
 }

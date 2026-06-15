@@ -7,7 +7,7 @@ data class GameState(
     val boardState: Map<Int, List<Piece>> = emptyMap(),
     val selectedPoint: Int? = null,
     val allowedMoves: Set<Int> = emptySet(),
-    val currentPlayer: Player? = null,
+    val currentPlayer: Player,
     val dice: List<Die> = listOf(Die(4), Die(3)),
     val movePool: List<Int> = emptyList(),
     val showRight: Boolean = false,
@@ -52,7 +52,7 @@ data class GameState(
     }
 
     fun isNotMyTurn(selectedPiece: Piece): Boolean {
-        return currentPlayer?.color != selectedPiece.color
+        return currentPlayer.color != selectedPiece.color
     }
 
     fun roundCompleted(): Boolean {
@@ -60,9 +60,7 @@ data class GameState(
     }
 
     fun gameComplete(boardState: Map<Int, List<Piece>>): Boolean {
-        val color = currentPlayer?.color ?: return false
-
-        val collectionIndex = CollectionIndex.get(color)
+        val collectionIndex = CollectionIndex.get(currentPlayer.color)
         return boardState[collectionIndex].orEmpty().size == TOTAL_PIECES
     }
 }
